@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collaborative Drawing Canvas</title>
+    <link rel="stylesheet" href="src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="drawing-canvas"></canvas>
+      <div id="connection-status" class="connection-status">
+        <span id="status-indicator" class="status-indicator disconnected"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+      <div id="controls" class="controls">
+        <button id="undo-btn" class="control-btn" disabled>Undo</button>
+        <button id="redo-btn" class="control-btn" disabled>Redo</button>
+        <button id="clear-btn" class="control-btn">Clear</button>
+      </div>
+    </div>
+    <script type="module" src="src/main.ts"></script>
+  </body>
+</html>
