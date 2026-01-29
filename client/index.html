@@ -8,7 +8,10 @@
   </head>
   <body>
     <div id="app">
-      <canvas id="drawing-canvas"></canvas>
+      <div id="canvas-container" class="canvas-container">
+        <canvas id="drawing-canvas"></canvas>
+        <canvas id="cursor-overlay"></canvas>
+      </div>
       <div id="connection-status" class="connection-status">
         <span id="status-indicator" class="status-indicator disconnected"></span>
         <span id="status-text">Connecting...</span>

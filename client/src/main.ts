@@ -54,13 +54,18 @@ wsClient.onDrawingEvent((event: DrawingEvent) => {
 });
 
 wsClient.onCursorEvent((cursor) => {
-  console.log('Received cursor event from user:', cursor.userId);
-  // TODO: Implement ghost cursor rendering in future tasks
+  console.log('Received cursor event from user:', cursor.userId, cursor.isActive);
+  canvas.renderGhostCursor(cursor);
 });
 
 wsClient.onStateSync((state) => {
   console.log('Received state sync:', state);
   // TODO: Implement state synchronization in future tasks
+});
+
+wsClient.onUserLeft((data) => {
+  console.log('User left room:', data.userId);
+  canvas.removeGhostCursor(data.userId);
 });
 
 canvas.setOnDrawingEvent((event: DrawingEvent) => {
@@ -70,6 +75,14 @@ canvas.setOnDrawingEvent((event: DrawingEvent) => {
     wsClient.emitDrawingEvent(event);
   } else {
     console.warn('Cannot send drawing event: not connected to server');
+  }
+});
+
+canvas.setOnCursorEvent((cursor) => {
+  console.log('Local cursor event:', cursor.userId, cursor.isActive);
+
+  if (isConnected) {
+    wsClient.emitCursorEvent(cursor);
   }
 });
 

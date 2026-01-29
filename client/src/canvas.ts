@@ -1,10 +1,14 @@
 import { Point, DrawingStyle, DrawingEvent, createDrawingEvent } from './drawing-events.js';
 import { DrawingRenderer } from './drawing-renderer.js';
+import { CursorEvent } from './websocket-client.js';
 
 export class Canvas {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private cursorOverlay: HTMLCanvasElement;
+  private cursorCtx: CanvasRenderingContext2D;
   private renderer: DrawingRenderer;
+  private cursorRenderer: DrawingRenderer;
   private devicePixelRatio: number;
   private isDrawing: boolean = false;
   private currentPath: Point[] = [];
@@ -15,8 +19,14 @@ export class Canvas {
     lineJoin: 'round',
   };
   private onDrawingEventCallback?: (event: DrawingEvent) => void;
+  private onCursorEventCallback?: (cursor: CursorEvent) => void;
   private userId: string = 'local-user';
   private roomId: string = 'default-room';
+  private lastCursorPosition: Point | null = null;
+  private cursorActivityTimer: NodeJS.Timeout | null = null;
+  private readonly CURSOR_INACTIVE_DELAY = 2000; // currently set to 2s
+  private ghostCursors: Map<string, CursorEvent> = new Map();
+  private userColors: Map<string, string> = new Map();
 
   constructor(canvasElement: HTMLCanvasElement) {
     this.canvas = canvasElement;
@@ -28,6 +38,19 @@ export class Canvas {
 
     this.ctx = context;
     this.renderer = new DrawingRenderer(context);
+
+    this.cursorOverlay = document.getElementById('cursor-overlay') as HTMLCanvasElement;
+    if (!this.cursorOverlay) {
+      throw new Error('Cursor overlay canvas not found');
+    }
+
+    const cursorContext = this.cursorOverlay.getContext('2d');
+    if (!cursorContext) {
+      throw new Error('Failed to get 2D context from cursor overlay canvas');
+    }
+
+    this.cursorCtx = cursorContext;
+    this.cursorRenderer = new DrawingRenderer(cursorContext);
     this.devicePixelRatio = window.devicePixelRatio || 1;
 
     this.setupCanvas();
@@ -46,6 +69,15 @@ export class Canvas {
 
     this.canvas.style.width = rect.width + 'px';
     this.canvas.style.height = rect.height + 'px';
+
+    // Setup cursor overlay with same dimensions
+    this.cursorOverlay.width = rect.width * this.devicePixelRatio;
+    this.cursorOverlay.height = rect.height * this.devicePixelRatio;
+
+    this.cursorCtx.scale(this.devicePixelRatio, this.devicePixelRatio);
+
+    this.cursorOverlay.style.width = rect.width + 'px';
+    this.cursorOverlay.style.height = rect.height + 'px';
 
     this.applyDrawingStyle(this.defaultStyle);
   }
@@ -83,6 +115,54 @@ export class Canvas {
 
   public renderDrawingEvent(event: DrawingEvent): void {
     this.renderer.renderDrawingEvent(event);
+  }
+
+  public renderGhostCursor(cursor: CursorEvent): void {
+    if (cursor.userId === this.userId) {
+      return;
+    }
+
+    if (cursor.isActive) {
+      this.ghostCursors.set(cursor.userId, cursor);
+
+      // Generate an consistent color for user if not exists
+      if (!this.userColors.has(cursor.userId)) {
+        this.userColors.set(cursor.userId, this.generateUserColor(cursor.userId));
+      }
+    } else {
+      this.ghostCursors.delete(cursor.userId);
+    }
+
+    this.rerenderGhostCursors();
+  }
+
+  public removeGhostCursor(userId: string): void {
+    this.ghostCursors.delete(userId);
+    this.userColors.delete(userId);
+    this.rerenderGhostCursors();
+  }
+
+  private rerenderGhostCursors(): void {
+    const dimensions = this.getDimensions();
+    this.cursorRenderer.clearCanvas(dimensions.width, dimensions.height);
+
+    // Render each active ghost cursor on the overlay
+    this.ghostCursors.forEach((cursor, userId) => {
+      if (cursor.isActive) {
+        const color = this.userColors.get(userId) || this.generateUserColor(userId);
+        this.cursorRenderer.renderGhostCursor(cursor, color);
+      }
+    });
+  }
+
+  private generateUserColor(userId: string): string {
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 50%)`;
   }
 
   public clearCanvas(): void {
@@ -207,24 +287,66 @@ export class Canvas {
     this.onDrawingEventCallback = callback;
   }
 
+  // callback for when a cursor event occurs
+  public setOnCursorEvent(callback: (cursor: CursorEvent) => void): void {
+    this.onCursorEventCallback = callback;
+  }
+
   public setUserContext(userId: string, roomId: string): void {
     this.userId = userId;
     this.roomId = roomId;
+  }
+
+  private emitCursorEvent(position: Point, isActive: boolean): void {
+    if (!this.onCursorEventCallback) return;
+
+    const cursorEvent: CursorEvent = {
+      userId: this.userId,
+      roomId: this.roomId,
+      position: {
+        x: position.x,
+        y: position.y,
+        timestamp: position.timestamp,
+      },
+      isActive,
+      timestamp: Date.now(),
+    };
+
+    this.onCursorEventCallback(cursorEvent);
+    this.lastCursorPosition = position;
+  }
+
+  private handleCursorMovement(position: Point): void {
+    this.emitCursorEvent(position, true);
+
+    if (this.cursorActivityTimer) {
+      clearTimeout(this.cursorActivityTimer);
+    }
+
+    // Set timer to mark cursor as inactive after delay
+    this.cursorActivityTimer = setTimeout(() => {
+      if (this.lastCursorPosition) {
+        this.emitCursorEvent(this.lastCursorPosition, false);
+      }
+    }, this.CURSOR_INACTIVE_DELAY);
   }
 
   // Mouse event handlers
   private handleMouseDown(event: MouseEvent): void {
     event.preventDefault();
     const point = this.screenToCanvas({ x: event.clientX, y: event.clientY });
+    this.handleCursorMovement(point);
     this.startDrawing(point);
   }
 
   private handleMouseMove(event: MouseEvent): void {
     event.preventDefault();
-    if (!this.isDrawing) return;
-
     const point = this.screenToCanvas({ x: event.clientX, y: event.clientY });
-    this.continueDrawing(point);
+    this.handleCursorMovement(point);
+
+    if (this.isDrawing) {
+      this.continueDrawing(point);
+    }
   }
 
   private handleMouseUp(event: MouseEvent): void {
@@ -239,16 +361,21 @@ export class Canvas {
 
     const touch = event.touches[0];
     const point = this.screenToCanvas({ x: touch.clientX, y: touch.clientY });
+    this.handleCursorMovement(point);
     this.startDrawing(point);
   }
 
   private handleTouchMove(event: TouchEvent): void {
     event.preventDefault();
-    if (event.touches.length !== 1 || !this.isDrawing) return;
+    if (event.touches.length !== 1) return;
 
     const touch = event.touches[0];
     const point = this.screenToCanvas({ x: touch.clientX, y: touch.clientY });
-    this.continueDrawing(point);
+    this.handleCursorMovement(point);
+
+    if (this.isDrawing) {
+      this.continueDrawing(point);
+    }
   }
 
   private handleTouchEnd(event: TouchEvent): void {

@@ -5,19 +5,6 @@ import cors from 'cors';
 import { RoomManager } from './room-manager';
 
 // Drawing event validation interfaces and functions TODO: need to create an seperate interface file
-interface Point {
-  x: number;
-  y: number;
-  timestamp: number;
-}
-
-interface DrawingStyle {
-  color: string;
-  lineWidth: number;
-  lineCap: 'round' | 'square' | 'butt';
-  lineJoin: 'round' | 'bevel' | 'miter';
-}
-
 interface ValidationResult {
   isValid: boolean;
   error?: string;
@@ -360,6 +347,19 @@ io.on('connection', (socket) => {
     connectedClients.delete(socket.id);
 
     // handiling client Disconnect
+    const currentRoom = roomManager.getClientRoom(socket.id);
+    if (currentRoom) {
+      roomManager.broadcastToRoom(
+        currentRoom.id,
+        'user-left',
+        {
+          userId: socket.id,
+          timestamp: new Date().toISOString(),
+        },
+        socket.id,
+      );
+    }
+
     roomManager.handleClientDisconnect(socket.id);
 
     console.log(

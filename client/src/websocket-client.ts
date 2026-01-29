@@ -29,6 +29,7 @@ export class WebSocketClient {
   private onCursorEventCallback?: (cursor: CursorEvent) => void;
   private onStateSyncCallback?: (state: any) => void;
   private onConnectionStateCallback?: (state: ConnectionState) => void;
+  private onUserLeftCallback?: (data: { userId: string; timestamp: string }) => void;
 
   constructor(private serverUrl: string = 'http://localhost:3001') {
     this.connectionState = {
@@ -204,6 +205,13 @@ export class WebSocketClient {
       console.log(`[WebSocketClient] Room join confirmed:`, data);
     });
 
+    this.socket.on('user-left', (data: any) => {
+      console.log(`[WebSocketClient] User left room:`, data);
+      if (this.onUserLeftCallback) {
+        this.onUserLeftCallback(data);
+      }
+    });
+
     this.socket.on('error', (error: any) => {
       console.error('[WebSocketClient] Socket error:', error);
       this.connectionState.lastError = error.message || 'Unknown socket error';
@@ -263,6 +271,10 @@ export class WebSocketClient {
 
   public onConnectionState(callback: (state: ConnectionState) => void): void {
     this.onConnectionStateCallback = callback;
+  }
+
+  public onUserLeft(callback: (data: { userId: string; timestamp: string }) => void): void {
+    this.onUserLeftCallback = callback;
   }
 
   // Getters
