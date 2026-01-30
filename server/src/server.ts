@@ -139,10 +139,38 @@ io.on('connection', (socket) => {
       const room = roomManager.joinRoom(socket.id, roomId);
       clientInfo.roomId = roomId;
 
+      // Get complete canvas state for new user
+      const canvasState = room.getCanvasState();
+      const drawingHistory = room.getDrawingHistory();
+
+      const validation = room.stateManager.validateState();
+      if (!validation.isValid) {
+        console.error(
+          `[${new Date().toISOString()}] State validation failed for room ${roomId}:`,
+          validation.errors,
+        );
+        socket.emit('error', {
+          message: 'Room state is corrupted',
+          code: 'INVALID_ROOM_STATE',
+          details: validation.errors,
+        });
+        return;
+      }
+
       socket.emit('room-joined', {
         roomId: room.id,
         clientCount: room.getClientCount(),
         timestamp: new Date().toISOString(),
+      });
+
+      // Sending complete state synchronization to new user
+      socket.emit('state-sync', {
+        roomId: room.id,
+        canvasState,
+        drawingHistory,
+        version: canvasState.version,
+        timestamp: new Date().toISOString(),
+        isComplete: true,
       });
 
       // Notify other clients in the room
@@ -156,7 +184,9 @@ io.on('connection', (socket) => {
         socket.id,
       );
 
-      console.log(`[${new Date().toISOString()}] Client ${socket.id} joined room ${roomId}`);
+      console.log(
+        `[${new Date().toISOString()}] Client ${socket.id} joined room ${roomId} and received state sync (${drawingHistory.length} events, version ${canvasState.version})`,
+      );
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error joining room for ${socket.id}:`, error);
       socket.emit('error', { message: 'Failed to join room', code: 'JOIN_ROOM_ERROR' });
@@ -221,6 +251,8 @@ io.on('connection', (socket) => {
         receivedAt: new Date().toISOString(),
         originalTimestamp: data.timestamp,
       };
+
+      currentRoom.addDrawingEvent(processedEvent);
 
       console.log(
         `[${new Date().toISOString()}] Valid drawing event from ${socket.id} in room ${currentRoom.id}: ${data.type}`,
@@ -289,12 +321,22 @@ io.on('connection', (socket) => {
         data,
       );
 
-      roomManager.broadcastToRoom(currentRoom.id, 'undo-request', {
-        ...data,
-        userId: socket.id,
-        roomId: currentRoom.id,
-        timestamp: new Date().toISOString(),
-      });
+      // Handling undo operation through state manager
+      const undoneEvent = currentRoom.handleUndo();
+
+      if (undoneEvent) {
+        roomManager.broadcastToRoom(currentRoom.id, 'undo-applied', {
+          undoneEvent,
+          userId: socket.id,
+          roomId: currentRoom.id,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        socket.emit('undo-failed', {
+          reason: 'No events to undo',
+          timestamp: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error processing undo request from ${socket.id}:`,
@@ -320,12 +362,22 @@ io.on('connection', (socket) => {
         data,
       );
 
-      roomManager.broadcastToRoom(currentRoom.id, 'redo-request', {
-        ...data,
-        userId: socket.id,
-        roomId: currentRoom.id,
-        timestamp: new Date().toISOString(),
-      });
+      // Handling redo operation through state manager
+      const redoneEvent = currentRoom.handleRedo();
+
+      if (redoneEvent) {
+        roomManager.broadcastToRoom(currentRoom.id, 'redo-applied', {
+          redoneEvent,
+          userId: socket.id,
+          roomId: currentRoom.id,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        socket.emit('redo-failed', {
+          reason: 'No events to redo',
+          timestamp: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error processing redo request from ${socket.id}:`,
@@ -334,6 +386,63 @@ io.on('connection', (socket) => {
       socket.emit('error', {
         message: 'Failed to process redo request',
         code: 'REDO_REQUEST_ERROR',
+      });
+    }
+  });
+
+  socket.on('request-state-sync', (data) => {
+    try {
+      const currentRoom = roomManager.getClientRoom(socket.id);
+      if (!currentRoom) {
+        socket.emit('error', { message: 'Not in a room', code: 'NOT_IN_ROOM' });
+        return;
+      }
+
+      const { clientVersion } = data || {};
+
+      const canvasState = currentRoom.getCanvasState();
+      const drawingHistory = currentRoom.getDrawingHistory();
+
+      const validation = currentRoom.stateManager.validateState();
+      if (!validation.isValid) {
+        console.error(
+          `[${new Date().toISOString()}] State validation failed for room ${currentRoom.id}:`,
+          validation.errors,
+        );
+        socket.emit('state-sync-failed', {
+          message: 'Room state is corrupted',
+          code: 'INVALID_ROOM_STATE',
+          errors: validation.errors,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // Check if client needs full sync or partial sync
+      const needsFullSync = !clientVersion || clientVersion < canvasState.version;
+
+      socket.emit('state-sync', {
+        roomId: currentRoom.id,
+        canvasState,
+        drawingHistory: needsFullSync ? drawingHistory : [],
+        version: canvasState.version,
+        clientVersion,
+        isComplete: needsFullSync,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(
+        `[${new Date().toISOString()}] State sync sent to ${socket.id} in room ${currentRoom.id} (client v${clientVersion} -> server v${canvasState.version}, full sync: ${needsFullSync})`,
+      );
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error processing state sync request from ${socket.id}:`,
+        error,
+      );
+      socket.emit('state-sync-failed', {
+        message: 'Failed to synchronize state',
+        code: 'STATE_SYNC_ERROR',
+        timestamp: new Date().toISOString(),
       });
     }
   });

@@ -30,6 +30,21 @@ export class WebSocketClient {
   private onStateSyncCallback?: (state: any) => void;
   private onConnectionStateCallback?: (state: ConnectionState) => void;
   private onUserLeftCallback?: (data: { userId: string; timestamp: string }) => void;
+  private onUndoAppliedCallback?: (data: {
+    undoneEvent: DrawingEvent;
+    userId: string;
+    timestamp: string;
+  }) => void;
+  private onRedoAppliedCallback?: (data: {
+    redoneEvent: DrawingEvent;
+    userId: string;
+    timestamp: string;
+  }) => void;
+  private onStateSyncFailedCallback?: (error: {
+    message: string;
+    code: string;
+    errors?: string[];
+  }) => void;
 
   constructor(private serverUrl: string = 'http://localhost:3001') {
     this.connectionState = {
@@ -175,6 +190,32 @@ export class WebSocketClient {
     });
   }
 
+  // emits a redo request to the server
+  public emitRedoRequest(): void {
+    if (!this.socket || !this.socket.connected) {
+      console.warn('[WebSocketClient] Cannot emit redo request: not connected');
+      return;
+    }
+
+    this.socket.emit('redo-request', {
+      userId: this.connectionState.userId,
+      roomId: this.connectionState.roomId,
+    });
+  }
+
+  // requests state synchronization from server
+  public requestStateSync(clientVersion?: number): void {
+    if (!this.socket || !this.socket.connected) {
+      console.warn('[WebSocketClient] Cannot request state sync: not connected');
+      return;
+    }
+
+    this.socket.emit('request-state-sync', {
+      clientVersion,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   private setupSocketEventListeners(): void {
     if (!this.socket) return;
 
@@ -209,6 +250,27 @@ export class WebSocketClient {
       console.log(`[WebSocketClient] User left room:`, data);
       if (this.onUserLeftCallback) {
         this.onUserLeftCallback(data);
+      }
+    });
+
+    this.socket.on('undo-applied', (data: any) => {
+      console.log(`[WebSocketClient] Undo applied:`, data);
+      if (this.onUndoAppliedCallback) {
+        this.onUndoAppliedCallback(data);
+      }
+    });
+
+    this.socket.on('redo-applied', (data: any) => {
+      console.log(`[WebSocketClient] Redo applied:`, data);
+      if (this.onRedoAppliedCallback) {
+        this.onRedoAppliedCallback(data);
+      }
+    });
+
+    this.socket.on('state-sync-failed', (error: any) => {
+      console.error(`[WebSocketClient] State sync failed:`, error);
+      if (this.onStateSyncFailedCallback) {
+        this.onStateSyncFailedCallback(error);
       }
     });
 
@@ -275,6 +337,24 @@ export class WebSocketClient {
 
   public onUserLeft(callback: (data: { userId: string; timestamp: string }) => void): void {
     this.onUserLeftCallback = callback;
+  }
+
+  public onUndoApplied(
+    callback: (data: { undoneEvent: DrawingEvent; userId: string; timestamp: string }) => void,
+  ): void {
+    this.onUndoAppliedCallback = callback;
+  }
+
+  public onRedoApplied(
+    callback: (data: { redoneEvent: DrawingEvent; userId: string; timestamp: string }) => void,
+  ): void {
+    this.onRedoAppliedCallback = callback;
+  }
+
+  public onStateSyncFailed(
+    callback: (error: { message: string; code: string; errors?: string[] }) => void,
+  ): void {
+    this.onStateSyncFailedCallback = callback;
   }
 
   // Getters

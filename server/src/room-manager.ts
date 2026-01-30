@@ -1,4 +1,5 @@
 import { Server } from 'socket.io';
+import { StateManager, CanvasState } from './state-manager';
 
 export interface CursorEvent {
   userId: string;
@@ -27,12 +28,14 @@ export class Room {
   public readonly id: string;
   public readonly clients: Set<string>;
   public readonly cursors: Map<string, CursorEvent>;
+  public readonly stateManager: StateManager;
   private readonly createdAt: Date;
 
   constructor(id: string) {
     this.id = id;
     this.clients = new Set();
     this.cursors = new Map();
+    this.stateManager = new StateManager(id);
     this.createdAt = new Date();
   }
 
@@ -73,7 +76,28 @@ export class Room {
       clientCount: this.clients.size,
       cursorCount: this.cursors.size,
       createdAt: this.createdAt,
+      stateStats: this.stateManager.getStateStats(),
     };
+  }
+
+  addDrawingEvent(event: DrawingEvent): void {
+    this.stateManager.addDrawingEvent(event);
+  }
+
+  getCanvasState(): CanvasState {
+    return this.stateManager.getCompleteState();
+  }
+
+  handleUndo(): DrawingEvent | null {
+    return this.stateManager.undo();
+  }
+
+  handleRedo(): DrawingEvent | null {
+    return this.stateManager.redo();
+  }
+
+  getDrawingHistory(): DrawingEvent[] {
+    return this.stateManager.reconstructCanvas();
   }
 }
 
@@ -189,6 +213,11 @@ export class RoomManager {
       rooms: Array.from(this.rooms.values()).map((room) => room.getInfo()),
     };
     return stats;
+  }
+
+  getRoomState(roomId: string): CanvasState | null {
+    const room = this.rooms.get(roomId);
+    return room ? room.getCanvasState() : null;
   }
 
   handleClientDisconnect(socketId: string): void {
