@@ -13,10 +13,5 @@ export default defineConfig(({ mode }) => {
       port: parseInt(env.VITE_PORT || '3000'),
       open: true,
     },
-    test: {
-      globals: true,
-      environment: 'jsdom',
-      setupFiles: ['./src/test-setup.ts'],
-    },
   };
 });
