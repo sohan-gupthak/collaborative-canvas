@@ -12,6 +12,7 @@ export class Canvas {
   private devicePixelRatio: number;
   private isDrawing: boolean = false;
   private currentPath: Point[] = [];
+  private currentStrokeStyle: DrawingStyle | null = null;
   private defaultStyle: DrawingStyle = {
     color: '#000000',
     lineWidth: 2,
@@ -115,9 +116,11 @@ export class Canvas {
     if (style.isEraser) {
       this.ctx.globalCompositeOperation = 'destination-out';
       this.ctx.strokeStyle = 'rgba(0,0,0,1)';
+      this.ctx.fillStyle = 'rgba(0,0,0,1)';
     } else {
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.strokeStyle = style.color;
+      this.ctx.fillStyle = style.color;
     }
     this.ctx.lineWidth = style.lineWidth;
     this.ctx.lineCap = style.lineCap;
@@ -266,6 +269,14 @@ export class Canvas {
     this.currentPath = [point];
     this.currentStrokeId = this.generateStrokeId();
 
+    this.currentStrokeStyle = {
+      color: this.isEraserMode ? '#ffffff' : this.currentColor,
+      lineWidth: this.currentLineWidth,
+      lineCap: 'round',
+      lineJoin: 'round',
+      isEraser: this.isEraserMode,
+    };
+
     // Draw initial point
     this.drawPoint(point);
 
@@ -296,14 +307,16 @@ export class Canvas {
 
     this.currentPath = [];
     this.currentStrokeId = null;
+    this.currentStrokeStyle = null;
   }
 
   private drawPoint(point: Point): void {
+    const styleToUse = this.currentStrokeStyle || this.defaultStyle;
     this.ctx.save();
-    this.applyDrawingStyle(this.defaultStyle);
+    this.applyDrawingStyle(styleToUse);
 
     this.ctx.beginPath();
-    this.ctx.arc(point.x, point.y, this.defaultStyle.lineWidth / 2, 0, 2 * Math.PI);
+    this.ctx.arc(point.x, point.y, styleToUse.lineWidth / 2, 0, 2 * Math.PI);
     this.ctx.fill();
 
     this.ctx.restore();
@@ -311,8 +324,9 @@ export class Canvas {
 
   // Draws a line between two points
   private drawLine(from: Point, to: Point): void {
+    const styleToUse = this.currentStrokeStyle || this.defaultStyle;
     this.ctx.save();
-    this.applyDrawingStyle(this.defaultStyle);
+    this.applyDrawingStyle(styleToUse);
 
     this.ctx.beginPath();
     this.ctx.moveTo(from.x, from.y);
@@ -325,13 +339,14 @@ export class Canvas {
   private emitDrawingEvent(type: 'line' | 'start' | 'end', points: Point[]): void {
     if (!this.onDrawingEventCallback) return;
 
+    const styleToUse = this.currentStrokeStyle || this.defaultStyle;
     const event = createDrawingEvent(
       type,
       this.userId,
       this.roomId,
       points,
       {
-        ...this.defaultStyle,
+        ...styleToUse,
       },
       this.currentStrokeId || undefined,
     );
