@@ -2,7 +2,10 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import { RoomManager } from './room-manager.js';
+
+dotenv.config();
 
 // Drawing event validation interfaces and functions TODO: need to create an seperate interface file
 interface ValidationResult {
@@ -90,10 +93,23 @@ function validateDrawingEventData(data: any): ValidationResult {
 const app = express();
 const server = createServer(app);
 
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((url) => url.trim())
+  : ['http://localhost:3000'];
+
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 

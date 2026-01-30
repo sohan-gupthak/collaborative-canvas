@@ -45,6 +45,26 @@ cd client && npm install
 cd server && npm install
 ```
 
+2. Set up environment variables:
+
+```bash
+# Copy example env files
+cp client/.env.example client/.env
+cp server/.env.example server/.env
+```
+
+Edit the `.env` files as needed:
+
+**Server (.env)**:
+
+- `PORT` - Server port (default: 3001)
+- `CLIENT_URL` - Client URL for CORS (default: http://localhost:3000)
+
+**Client (.env)**:
+
+- `VITE_PORT` - Client port (default: 3000)
+- `VITE_SERVER_URL` - WebSocket server URL (default: http://localhost:3001)
+
 ### Development
 
 Start both client and server in development mode:
@@ -57,7 +77,7 @@ npm run dev:server
 npm run dev:client
 ```
 
-The client will be available at `http://localhost:3000` and the server at `http://localhost:3001`.
+The client will be available at the port specified in `client/.env` (default: `http://localhost:3000`) and the server at the port specified in `server/.env` (default: `http://localhost:3001`).
 
 ### Testing (TODO: need to implement unit tests)
 

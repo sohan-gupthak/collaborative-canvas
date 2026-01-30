@@ -15,7 +15,7 @@ if (!canvasElement) {
 const canvas = new Canvas(canvasElement);
 
 // WebSocket client instance
-const wsClient = new WebSocketClient('http://localhost:3001');
+const wsClient = new WebSocketClient(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
 
 // Client state manager instance
 const stateManager = new ClientStateManager();
