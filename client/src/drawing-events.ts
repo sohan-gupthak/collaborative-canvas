@@ -9,6 +9,7 @@ export interface DrawingStyle {
   lineWidth: number;
   lineCap: 'round' | 'square' | 'butt';
   lineJoin: 'round' | 'bevel' | 'miter';
+  isEraser?: boolean;
 }
 
 export interface DrawingEvent {

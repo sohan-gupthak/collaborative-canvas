@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Collaborative Drawing Canvas</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+      crossorigin="anonymous"
+    />
     <link rel="stylesheet" href="src/style.css" />
   </head>
   <body>
@@ -15,6 +20,37 @@
       <div id="connection-status" class="connection-status">
         <span id="status-indicator" class="status-indicator disconnected"></span>
         <span id="status-text">Connecting...</span>
+      </div>
+      <div id="toolbar" class="toolbar">
+        <div class="toolbar-section">
+          <label for="tool-brush" class="tool-label">
+            <input type="radio" id="tool-brush" name="tool" value="brush" checked />
+            <span class="tool-icon"><i class="fas fa-paint-brush"></i></span>
+            <span class="tool-text">Brush</span>
+          </label>
+          <label for="tool-eraser" class="tool-label">
+            <input type="radio" id="tool-eraser" name="tool" value="eraser" />
+            <span class="tool-icon"><i class="fas fa-eraser"></i></span>
+            <span class="tool-text">Eraser</span>
+          </label>
+        </div>
+        <div class="toolbar-section">
+          <label for="color-picker" class="toolbar-item-label">Color:</label>
+          <input type="color" id="color-picker" class="color-picker" value="#000000" />
+        </div>
+        <div class="toolbar-section">
+          <label for="brush-size" class="toolbar-item-label">
+            Size: <span id="brush-size-value">2</span>px
+          </label>
+          <input
+            type="range"
+            id="brush-size"
+            class="brush-size-slider"
+            min="1"
+            max="50"
+            value="2"
+          />
+        </div>
       </div>
       <div id="controls" class="controls">
         <button id="undo-btn" class="control-btn" disabled>Undo</button>

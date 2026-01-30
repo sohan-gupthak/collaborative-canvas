@@ -17,7 +17,11 @@ export class Canvas {
     lineWidth: 2,
     lineCap: 'round',
     lineJoin: 'round',
+    isEraser: false,
   };
+  private currentColor: string = '#000000';
+  private currentLineWidth: number = 2;
+  private isEraserMode: boolean = false;
   private onDrawingEventCallback?: (event: DrawingEvent) => void;
   private onCursorEventCallback?: (cursor: CursorEvent) => void;
   private userId: string = 'local-user';
@@ -108,7 +112,13 @@ export class Canvas {
   }
 
   private applyDrawingStyle(style: DrawingStyle): void {
-    this.ctx.strokeStyle = style.color;
+    if (style.isEraser) {
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.strokeStyle = style.color;
+    }
     this.ctx.lineWidth = style.lineWidth;
     this.ctx.lineCap = style.lineCap;
     this.ctx.lineJoin = style.lineJoin;
@@ -196,6 +206,43 @@ export class Canvas {
 
   public getContext(): CanvasRenderingContext2D {
     return this.ctx;
+  }
+
+  public setColor(color: string): void {
+    this.currentColor = color;
+    this.updateDefaultStyle();
+  }
+
+  public getColor(): string {
+    return this.currentColor;
+  }
+
+  public setBrushSize(size: number): void {
+    this.currentLineWidth = Math.max(1, Math.min(50, size));
+    this.updateDefaultStyle();
+  }
+
+  public getBrushSize(): number {
+    return this.currentLineWidth;
+  }
+
+  public setEraserMode(enabled: boolean): void {
+    this.isEraserMode = enabled;
+    this.updateDefaultStyle();
+  }
+
+  public isEraser(): boolean {
+    return this.isEraserMode;
+  }
+
+  private updateDefaultStyle(): void {
+    this.defaultStyle = {
+      color: this.isEraserMode ? '#ffffff' : this.currentColor,
+      lineWidth: this.currentLineWidth,
+      lineCap: 'round',
+      lineJoin: 'round',
+      isEraser: this.isEraserMode,
+    };
   }
 
   private setupDrawingEventListeners(): void {

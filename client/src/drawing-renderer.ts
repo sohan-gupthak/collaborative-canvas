@@ -41,8 +41,15 @@ export class DrawingRenderer {
   }
 
   private applyDrawingStyle(style: DrawingStyle): void {
-    this.ctx.strokeStyle = style.color;
-    this.ctx.fillStyle = style.color;
+    if (style.isEraser) {
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.strokeStyle = 'rgba(0,0,0,1)';
+      this.ctx.fillStyle = 'rgba(0,0,0,1)';
+    } else {
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.strokeStyle = style.color;
+      this.ctx.fillStyle = style.color;
+    }
     this.ctx.lineWidth = style.lineWidth;
     this.ctx.lineCap = style.lineCap;
     this.ctx.lineJoin = style.lineJoin;

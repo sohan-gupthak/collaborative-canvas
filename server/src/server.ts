@@ -390,7 +390,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('clear-canvas', (data) => {
+  socket.on('clear-canvas', () => {
     try {
       const currentRoom = roomManager.getClientRoom(socket.id);
       if (!currentRoom) {

@@ -172,6 +172,48 @@ if (clearBtn) {
   });
 }
 
+// Drawing tool controls
+const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
+const brushSizeSlider = document.getElementById('brush-size') as HTMLInputElement;
+const brushSizeValue = document.getElementById('brush-size-value') as HTMLSpanElement;
+const toolBrush = document.getElementById('tool-brush') as HTMLInputElement;
+const toolEraser = document.getElementById('tool-eraser') as HTMLInputElement;
+
+if (colorPicker) {
+  colorPicker.addEventListener('input', (event) => {
+    const color = (event.target as HTMLInputElement).value;
+    canvas.setColor(color);
+    console.log('Color changed to:', color);
+  });
+}
+
+if (brushSizeSlider && brushSizeValue) {
+  brushSizeSlider.addEventListener('input', (event) => {
+    const size = parseInt((event.target as HTMLInputElement).value, 10);
+    canvas.setBrushSize(size);
+    brushSizeValue.textContent = size.toString();
+    console.log('Brush size changed to:', size);
+  });
+}
+
+if (toolBrush) {
+  toolBrush.addEventListener('change', () => {
+    if (toolBrush.checked) {
+      canvas.setEraserMode(false);
+      console.log('Tool switched to: Brush');
+    }
+  });
+}
+
+if (toolEraser) {
+  toolEraser.addEventListener('change', () => {
+    if (toolEraser.checked) {
+      canvas.setEraserMode(true);
+      console.log('Tool switched to: Eraser');
+    }
+  });
+}
+
 // Keyboard shortcuts for undo/redo
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
