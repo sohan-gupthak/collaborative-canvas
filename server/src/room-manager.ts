@@ -11,6 +11,7 @@ export interface CursorEvent {
 
 export interface DrawingEvent {
   id: string;
+  strokeId: string;
   type: 'line' | 'start' | 'end';
   userId: string;
   roomId: string;
@@ -88,11 +89,11 @@ export class Room {
     return this.stateManager.getCompleteState();
   }
 
-  handleUndo(): DrawingEvent | null {
+  handleUndo(): DrawingEvent[] | null {
     return this.stateManager.undo();
   }
 
-  handleRedo(): DrawingEvent | null {
+  handleRedo(): DrawingEvent[] | null {
     return this.stateManager.redo();
   }
 

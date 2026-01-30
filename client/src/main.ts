@@ -1,6 +1,7 @@
 import { Canvas } from './canvas.js';
 import { WebSocketClient } from './websocket-client.js';
 import { DrawingEvent } from './drawing-events.js';
+import { ClientStateManager } from './client-state-manager.js';
 
 console.log('Collaborative Drawing Canvas - Client Starting...');
 
@@ -15,6 +16,9 @@ const canvas = new Canvas(canvasElement);
 
 // WebSocket client instance
 const wsClient = new WebSocketClient('http://localhost:3001');
+
+// Client state manager instance
+const stateManager = new ClientStateManager();
 
 // Get room ID from URL or use default one
 const urlParams = new URLSearchParams(window.location.search);
@@ -33,22 +37,10 @@ function updateConnectionStatus(connected: boolean, message: string) {
   }
 }
 
-wsClient.onConnectionState((state) => {
-  isConnected = state.isConnected;
-
-  if (state.isConnected) {
-    updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
-    console.log('Connected to WebSocket server, room:', state.roomId);
-
-    canvas.setUserContext(state.userId, state.roomId || roomId);
-  } else {
-    updateConnectionStatus(false, state.lastError || 'Disconnected');
-    console.log('Disconnected from WebSocket server');
-  }
-});
-
 wsClient.onDrawingEvent((event: DrawingEvent) => {
   console.log('Received drawing event from user:', event.userId, event.type);
+
+  stateManager.addDrawingEvent(event);
 
   canvas.renderDrawingEvent(event);
 });
@@ -60,7 +52,7 @@ wsClient.onCursorEvent((cursor) => {
 
 wsClient.onStateSync((state) => {
   console.log('Received state sync:', state);
-  // TODO: Implement state synchronization in future tasks
+  stateManager.handleStateSync(state);
 });
 
 wsClient.onUserLeft((data) => {
@@ -68,14 +60,43 @@ wsClient.onUserLeft((data) => {
   canvas.removeGhostCursor(data.userId);
 });
 
+wsClient.onUndoApplied((data) => {
+  console.log('Undo applied by user:', data.userId, 'events:', data.undoneEvents.length);
+  stateManager.handleUndo(data.undoneEvents);
+  updateUndoRedoButtons();
+});
+
+wsClient.onRedoApplied((data) => {
+  console.log('Redo applied by user:', data.userId, 'events:', data.redoneEvents.length);
+  stateManager.handleRedo(data.redoneEvents);
+  updateUndoRedoButtons();
+});
+
+stateManager.onStateReconstructed((events: DrawingEvent[]) => {
+  console.log('Reconstructing canvas with', events.length, 'events');
+  canvas.clearCanvas();
+  events.forEach((event) => {
+    canvas.renderDrawingEvent(event);
+  });
+});
+
+stateManager.onStateValidationFailed((errors: string[]) => {
+  console.error('State validation failed:', errors);
+  // TODO: Show error message to user
+});
+
 canvas.setOnDrawingEvent((event: DrawingEvent) => {
   console.log('Local drawing event:', event.type);
+
+  stateManager.addDrawingEvent(event);
 
   if (isConnected) {
     wsClient.emitDrawingEvent(event);
   } else {
     console.warn('Cannot send drawing event: not connected to server');
   }
+
+  updateUndoRedoButtons();
 });
 
 canvas.setOnCursorEvent((cursor) => {
@@ -99,6 +120,88 @@ async function initializeConnection() {
 }
 
 initializeConnection();
+
+// Undo/Redo UI Controls
+const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+const redoBtn = document.getElementById('redo-btn') as HTMLButtonElement;
+const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
+
+function updateUndoRedoButtons() {
+  // For now, we are using enable/disable based on connection status
+  if (undoBtn && redoBtn) {
+    undoBtn.disabled = !isConnected;
+    redoBtn.disabled = !isConnected;
+  }
+}
+
+if (undoBtn) {
+  undoBtn.addEventListener('click', () => {
+    if (isConnected) {
+      console.log('Undo button clicked');
+      wsClient.emitUndoRequest();
+    }
+  });
+}
+
+if (redoBtn) {
+  redoBtn.addEventListener('click', () => {
+    if (isConnected) {
+      console.log('Redo button clicked');
+      wsClient.emitRedoRequest();
+    }
+  });
+}
+
+if (clearBtn) {
+  clearBtn.addEventListener('click', () => {
+    console.log('Clear button clicked - not implemented yet');
+    // TODO: Implement canvas clear functionality
+  });
+}
+
+// Keyboard shortcuts for undo/redo
+document.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    return;
+  }
+
+  // Ctrl+Z or Cmd+Z for undo
+  if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+    event.preventDefault();
+    if (isConnected) {
+      console.log('Undo keyboard shortcut triggered');
+      wsClient.emitUndoRequest();
+    }
+  }
+
+  // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z or Cmd+Shift+Z for redo
+  if (
+    ((event.ctrlKey || event.metaKey) && event.key === 'y') ||
+    ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Z')
+  ) {
+    event.preventDefault();
+    if (isConnected) {
+      console.log('Redo keyboard shortcut triggered');
+      wsClient.emitRedoRequest();
+    }
+  }
+});
+
+wsClient.onConnectionState((state) => {
+  isConnected = state.isConnected;
+
+  if (state.isConnected) {
+    updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
+    console.log('Connected to WebSocket server, room:', state.roomId);
+
+    canvas.setUserContext(state.userId, state.roomId || roomId);
+    updateUndoRedoButtons();
+  } else {
+    updateConnectionStatus(false, state.lastError || 'Disconnected');
+    console.log('Disconnected from WebSocket server');
+    updateUndoRedoButtons();
+  }
+});
 
 window.addEventListener('beforeunload', () => {
   wsClient.disconnect();

@@ -31,12 +31,12 @@ export class WebSocketClient {
   private onConnectionStateCallback?: (state: ConnectionState) => void;
   private onUserLeftCallback?: (data: { userId: string; timestamp: string }) => void;
   private onUndoAppliedCallback?: (data: {
-    undoneEvent: DrawingEvent;
+    undoneEvents: DrawingEvent[];
     userId: string;
     timestamp: string;
   }) => void;
   private onRedoAppliedCallback?: (data: {
-    redoneEvent: DrawingEvent;
+    redoneEvents: DrawingEvent[];
     userId: string;
     timestamp: string;
   }) => void;
@@ -340,13 +340,13 @@ export class WebSocketClient {
   }
 
   public onUndoApplied(
-    callback: (data: { undoneEvent: DrawingEvent; userId: string; timestamp: string }) => void,
+    callback: (data: { undoneEvents: DrawingEvent[]; userId: string; timestamp: string }) => void,
   ): void {
     this.onUndoAppliedCallback = callback;
   }
 
   public onRedoApplied(
-    callback: (data: { redoneEvent: DrawingEvent; userId: string; timestamp: string }) => void,
+    callback: (data: { redoneEvents: DrawingEvent[]; userId: string; timestamp: string }) => void,
   ): void {
     this.onRedoAppliedCallback = callback;
   }

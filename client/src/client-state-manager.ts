@@ -219,39 +219,41 @@ export class ClientStateManager {
     return left;
   }
 
-  // handle undo operation from server (Removing the event from drawing events)
-  public handleUndo(undoneEvent: DrawingEvent): void {
-    const eventIndex = this.currentState.drawingEvents.findIndex((e) => e.id === undoneEvent.id);
-    if (eventIndex !== -1) {
-      this.currentState.drawingEvents.splice(eventIndex, 1);
-      this.currentState.undoStack.push(undoneEvent);
-      this.currentState.version++;
-
-      console.log(`[ClientStateManager] Handled undo for event ${undoneEvent.id}`);
-
-      if (this.onStateReconstructedCallback) {
-        this.onStateReconstructedCallback(this.currentState.drawingEvents);
+  public handleUndo(undoneEvents: DrawingEvent[]): void {
+    undoneEvents.forEach((undoneEvent) => {
+      const eventIndex = this.currentState.drawingEvents.findIndex((e) => e.id === undoneEvent.id);
+      if (eventIndex !== -1) {
+        this.currentState.drawingEvents.splice(eventIndex, 1);
+        this.currentState.undoStack.push(undoneEvent);
       }
+    });
+
+    this.currentState.version++;
+
+    console.log(`[ClientStateManager] Handled undo for ${undoneEvents.length} events`);
+
+    if (this.onStateReconstructedCallback) {
+      this.onStateReconstructedCallback(this.currentState.drawingEvents);
     }
   }
 
-  // handle redo operation from server (Remove from undo stack and add back to drawing events)
-  public handleRedo(redoneEvent: DrawingEvent): void {
-    const undoIndex = this.currentState.undoStack.findIndex((e) => e.id === redoneEvent.id);
-    if (undoIndex !== -1) {
-      this.currentState.undoStack.splice(undoIndex, 1);
+  public handleRedo(redoneEvents: DrawingEvent[]): void {
+    redoneEvents.forEach((redoneEvent) => {
+      const undoIndex = this.currentState.undoStack.findIndex((e) => e.id === redoneEvent.id);
+      if (undoIndex !== -1) {
+        this.currentState.undoStack.splice(undoIndex, 1);
 
-      // Insert in chronological order
-      const insertIndex = this.findInsertionIndex(redoneEvent.timestamp);
-      this.currentState.drawingEvents.splice(insertIndex, 0, redoneEvent);
-
-      this.currentState.version++;
-
-      console.log(`[ClientStateManager] Handled redo for event ${redoneEvent.id}`);
-
-      if (this.onStateReconstructedCallback) {
-        this.onStateReconstructedCallback(this.currentState.drawingEvents);
+        const insertIndex = this.findInsertionIndex(redoneEvent.timestamp);
+        this.currentState.drawingEvents.splice(insertIndex, 0, redoneEvent);
       }
+    });
+
+    this.currentState.version++;
+
+    console.log(`[ClientStateManager] Handled redo for ${redoneEvents.length} events`);
+
+    if (this.onStateReconstructedCallback) {
+      this.onStateReconstructedCallback(this.currentState.drawingEvents);
     }
   }
 

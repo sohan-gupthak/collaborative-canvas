@@ -70,43 +70,71 @@ export class StateManager {
     return left;
   }
 
-  undo(): DrawingEvent | null {
+  undo(): DrawingEvent[] | null {
     if (this.drawingHistory.length === 0) {
       return null;
     }
 
-    // Removing the most recent event from drawing history and adding to undo stack
-    const eventToUndo = this.drawingHistory.pop()!;
+    // Get the most recent event to find its strokeId
+    const mostRecentEvent = this.drawingHistory[this.drawingHistory.length - 1];
+    const strokeIdToUndo = mostRecentEvent.strokeId;
 
-    this.undoStack.push(eventToUndo);
+    // Find all events with the same strokeId
+    const eventsToUndo: DrawingEvent[] = [];
+    for (let i = this.drawingHistory.length - 1; i >= 0; i--) {
+      if (this.drawingHistory[i].strokeId === strokeIdToUndo) {
+        eventsToUndo.unshift(this.drawingHistory.splice(i, 1)[0]);
+      }
+    }
+
+    if (eventsToUndo.length === 0) {
+      return null;
+    }
+
+    this.undoStack.push(...eventsToUndo);
 
     this.version++;
 
     console.log(
-      `[${new Date().toISOString()}] Undo operation in room ${this.roomId}, event: ${eventToUndo.id}, version: ${this.version}`,
+      `[${new Date().toISOString()}] Undo operation in room ${this.roomId}, removed ${eventsToUndo.length} events with strokeId: ${strokeIdToUndo}, version: ${this.version}`,
     );
 
-    return eventToUndo;
+    return eventsToUndo;
   }
 
-  redo(): DrawingEvent | null {
+  redo(): DrawingEvent[] | null {
     if (this.undoStack.length === 0) {
       return null;
     }
 
-    // Removing from undo stack
-    const eventToRedo = this.undoStack.pop()!;
+    // Get the most recent undone event to find its strokeId
+    const mostRecentUndoneEvent = this.undoStack[this.undoStack.length - 1];
+    const strokeIdToRedo = mostRecentUndoneEvent.strokeId;
 
-    const insertIndex = this.findInsertionIndex(eventToRedo.timestamp);
-    this.drawingHistory.splice(insertIndex, 0, eventToRedo);
+    // Find all events with the same strokeId in the undo stack
+    const eventsToRedo: DrawingEvent[] = [];
+    for (let i = this.undoStack.length - 1; i >= 0; i--) {
+      if (this.undoStack[i].strokeId === strokeIdToRedo) {
+        eventsToRedo.unshift(this.undoStack.splice(i, 1)[0]);
+      }
+    }
+
+    if (eventsToRedo.length === 0) {
+      return null;
+    }
+
+    eventsToRedo.forEach((event) => {
+      const insertIndex = this.findInsertionIndex(event.timestamp);
+      this.drawingHistory.splice(insertIndex, 0, event);
+    });
 
     this.version++;
 
     console.log(
-      `[${new Date().toISOString()}] Redo operation in room ${this.roomId}, event: ${eventToRedo.id}, version: ${this.version}`,
+      `[${new Date().toISOString()}] Redo operation in room ${this.roomId}, restored ${eventsToRedo.length} events with strokeId: ${strokeIdToRedo}, version: ${this.version}`,
     );
 
-    return eventToRedo;
+    return eventsToRedo;
   }
 
   getCompleteState(): CanvasState {

@@ -322,11 +322,11 @@ io.on('connection', (socket) => {
       );
 
       // Handling undo operation through state manager
-      const undoneEvent = currentRoom.handleUndo();
+      const undoneEvents = currentRoom.handleUndo();
 
-      if (undoneEvent) {
+      if (undoneEvents && undoneEvents.length > 0) {
         roomManager.broadcastToRoom(currentRoom.id, 'undo-applied', {
-          undoneEvent,
+          undoneEvents,
           userId: socket.id,
           roomId: currentRoom.id,
           timestamp: new Date().toISOString(),
@@ -363,11 +363,11 @@ io.on('connection', (socket) => {
       );
 
       // Handling redo operation through state manager
-      const redoneEvent = currentRoom.handleRedo();
+      const redoneEvents = currentRoom.handleRedo();
 
-      if (redoneEvent) {
+      if (redoneEvents && redoneEvents.length > 0) {
         roomManager.broadcastToRoom(currentRoom.id, 'redo-applied', {
-          redoneEvent,
+          redoneEvents,
           userId: socket.id,
           roomId: currentRoom.id,
           timestamp: new Date().toISOString(),

@@ -13,6 +13,7 @@ export interface DrawingStyle {
 
 export interface DrawingEvent {
   id: string;
+  strokeId: string;
   type: 'line' | 'start' | 'end';
   userId: string;
   roomId: string;
@@ -61,12 +62,14 @@ export function validateDrawingEvent(event: any): event is DrawingEvent {
     typeof event === 'object' &&
     event !== null &&
     typeof event.id === 'string' &&
+    typeof event.strokeId === 'string' &&
     typeof event.type === 'string' &&
     typeof event.userId === 'string' &&
     typeof event.roomId === 'string' &&
     Array.isArray(event.points) &&
     typeof event.timestamp === 'number' &&
     event.id.length > 0 &&
+    event.strokeId.length > 0 &&
     validTypes.includes(event.type) &&
     event.userId.length > 0 &&
     event.roomId.length > 0 &&
@@ -103,6 +106,7 @@ export function sanitizeDrawingStyle(style: DrawingStyle): DrawingStyle {
 export function sanitizeDrawingEvent(event: DrawingEvent): DrawingEvent {
   return {
     id: event.id.trim(),
+    strokeId: event.strokeId.trim(),
     type: event.type,
     userId: event.userId.trim(),
     roomId: event.roomId.trim(),
@@ -118,9 +122,11 @@ export function createDrawingEvent(
   roomId: string,
   points: Point[],
   style: DrawingStyle,
+  strokeId?: string,
 ): DrawingEvent {
   const event: DrawingEvent = {
     id: generateEventId(),
+    strokeId: strokeId || generateEventId(),
     type,
     userId: userId.trim(),
     roomId: roomId.trim(),

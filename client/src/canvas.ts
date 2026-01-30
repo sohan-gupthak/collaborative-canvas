@@ -22,6 +22,7 @@ export class Canvas {
   private onCursorEventCallback?: (cursor: CursorEvent) => void;
   private userId: string = 'local-user';
   private roomId: string = 'default-room';
+  private currentStrokeId: string | null = null;
   private lastCursorPosition: Point | null = null;
   private cursorActivityTimer: NodeJS.Timeout | null = null;
   private readonly CURSOR_INACTIVE_DELAY = 2000; // currently set to 2s
@@ -216,6 +217,7 @@ export class Canvas {
   public startDrawing(point: Point): void {
     this.isDrawing = true;
     this.currentPath = [point];
+    this.currentStrokeId = this.generateStrokeId();
 
     // Draw initial point
     this.drawPoint(point);
@@ -246,6 +248,7 @@ export class Canvas {
     this.emitDrawingEvent('end', [...this.currentPath]);
 
     this.currentPath = [];
+    this.currentStrokeId = null;
   }
 
   private drawPoint(point: Point): void {
@@ -275,11 +278,22 @@ export class Canvas {
   private emitDrawingEvent(type: 'line' | 'start' | 'end', points: Point[]): void {
     if (!this.onDrawingEventCallback) return;
 
-    const event = createDrawingEvent(type, this.userId, this.roomId, points, {
-      ...this.defaultStyle,
-    });
+    const event = createDrawingEvent(
+      type,
+      this.userId,
+      this.roomId,
+      points,
+      {
+        ...this.defaultStyle,
+      },
+      this.currentStrokeId || undefined,
+    );
 
     this.onDrawingEventCallback(event);
+  }
+
+  private generateStrokeId(): string {
+    return `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   // callback for when a drawing event occurs
