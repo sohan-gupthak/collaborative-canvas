@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { StateManager, CanvasState } from './state-manager';
+import { StateManager, CanvasState } from './state-manager.js';
 
 export interface CursorEvent {
   userId: string;
@@ -99,6 +99,11 @@ export class Room {
 
   getDrawingHistory(): DrawingEvent[] {
     return this.stateManager.reconstructCanvas();
+  }
+
+  clearCanvas(): void {
+    this.stateManager.clearState();
+    console.log(`[${new Date().toISOString()}] Canvas cleared in room ${this.id}`);
   }
 }
 

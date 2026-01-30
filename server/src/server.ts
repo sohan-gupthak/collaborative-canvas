@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { RoomManager } from './room-manager';
+import { RoomManager } from './room-manager.js';
 
 // Drawing event validation interfaces and functions TODO: need to create an seperate interface file
 interface ValidationResult {
@@ -386,6 +386,41 @@ io.on('connection', (socket) => {
       socket.emit('error', {
         message: 'Failed to process redo request',
         code: 'REDO_REQUEST_ERROR',
+      });
+    }
+  });
+
+  socket.on('clear-canvas', (data) => {
+    try {
+      const currentRoom = roomManager.getClientRoom(socket.id);
+      if (!currentRoom) {
+        socket.emit('error', { message: 'Not in a room', code: 'NOT_IN_ROOM' });
+        return;
+      }
+
+      console.log(
+        `[${new Date().toISOString()}] Clear canvas request from ${socket.id} in room ${currentRoom.id}`,
+      );
+
+      currentRoom.clearCanvas();
+
+      roomManager.broadcastToRoom(currentRoom.id, 'canvas-cleared', {
+        userId: socket.id,
+        roomId: currentRoom.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(
+        `[${new Date().toISOString()}] Canvas cleared in room ${currentRoom.id} by ${socket.id}`,
+      );
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error processing clear canvas from ${socket.id}:`,
+        error,
+      );
+      socket.emit('error', {
+        message: 'Failed to clear canvas',
+        code: 'CLEAR_CANVAS_ERROR',
       });
     }
   });

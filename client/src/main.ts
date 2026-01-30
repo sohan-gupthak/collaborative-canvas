@@ -72,6 +72,13 @@ wsClient.onRedoApplied((data) => {
   updateUndoRedoButtons();
 });
 
+wsClient.onCanvasCleared((data) => {
+  console.log('Canvas cleared by user:', data.userId);
+  stateManager.clearState();
+  canvas.clearCanvas();
+  updateUndoRedoButtons();
+});
+
 stateManager.onStateReconstructed((events: DrawingEvent[]) => {
   console.log('Reconstructing canvas with', events.length, 'events');
   canvas.clearCanvas();
@@ -154,8 +161,14 @@ if (redoBtn) {
 
 if (clearBtn) {
   clearBtn.addEventListener('click', () => {
-    console.log('Clear button clicked - not implemented yet');
-    // TODO: Implement canvas clear functionality
+    if (isConnected) {
+      console.log('Clear button clicked');
+      wsClient.emitClearCanvas();
+    } else {
+      console.log('Clear button clicked - clearing locally (not connected)');
+      stateManager.clearState();
+      canvas.clearCanvas();
+    }
   });
 }
 

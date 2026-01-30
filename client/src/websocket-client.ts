@@ -45,6 +45,7 @@ export class WebSocketClient {
     code: string;
     errors?: string[];
   }) => void;
+  private onCanvasClearedCallback?: (data: { userId: string; timestamp: string }) => void;
 
   constructor(private serverUrl: string = 'http://localhost:3001') {
     this.connectionState = {
@@ -216,6 +217,20 @@ export class WebSocketClient {
     });
   }
 
+  // emits a clear canvas request to the server
+  public emitClearCanvas(): void {
+    if (!this.socket || !this.socket.connected) {
+      console.warn('[WebSocketClient] Cannot emit clear canvas: not connected');
+      return;
+    }
+
+    this.socket.emit('clear-canvas', {
+      userId: this.connectionState.userId,
+      roomId: this.connectionState.roomId,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   private setupSocketEventListeners(): void {
     if (!this.socket) return;
 
@@ -271,6 +286,13 @@ export class WebSocketClient {
       console.error(`[WebSocketClient] State sync failed:`, error);
       if (this.onStateSyncFailedCallback) {
         this.onStateSyncFailedCallback(error);
+      }
+    });
+
+    this.socket.on('canvas-cleared', (data: any) => {
+      console.log(`[WebSocketClient] Canvas cleared:`, data);
+      if (this.onCanvasClearedCallback) {
+        this.onCanvasClearedCallback(data);
       }
     });
 
@@ -355,6 +377,10 @@ export class WebSocketClient {
     callback: (error: { message: string; code: string; errors?: string[] }) => void,
   ): void {
     this.onStateSyncFailedCallback = callback;
+  }
+
+  public onCanvasCleared(callback: (data: { userId: string; timestamp: string }) => void): void {
+    this.onCanvasClearedCallback = callback;
   }
 
   // Getters

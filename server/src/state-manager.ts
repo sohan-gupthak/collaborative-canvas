@@ -1,4 +1,4 @@
-import { DrawingEvent } from './room-manager';
+import { DrawingEvent } from './room-manager.js';
 
 export interface CanvasState {
   drawingEvents: DrawingEvent[];
