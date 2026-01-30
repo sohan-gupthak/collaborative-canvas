@@ -118,6 +118,10 @@ export class RoomManager {
     this.io = io;
   }
 
+  hasRoom(roomId: string): boolean {
+    return this.rooms.has(roomId);
+  }
+
   createRoom(roomId: string): Room {
     if (this.rooms.has(roomId)) {
       console.log(`[${new Date().toISOString()}] Room ${roomId} already exists`);
@@ -130,12 +134,15 @@ export class RoomManager {
     return room;
   }
 
-  joinRoom(socketId: string, roomId: string): Room {
+  joinRoom(socketId: string, roomId: string, createIfNotExists: boolean = true): Room {
     // function to leaveRoom
     this.leaveRoom(socketId);
 
     let room = this.rooms.get(roomId);
     if (!room) {
+      if (!createIfNotExists) {
+        throw new Error(`Room '${roomId}' does not exist`);
+      }
       room = this.createRoom(roomId);
     }
 

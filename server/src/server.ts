@@ -130,13 +130,21 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', (data) => {
     try {
-      const { roomId } = data;
+      const { roomId, createIfNotExists } = data;
       if (!roomId || typeof roomId !== 'string') {
         socket.emit('error', { message: 'Invalid room ID', code: 'INVALID_ROOM_ID' });
         return;
       }
 
-      const room = roomManager.joinRoom(socket.id, roomId);
+      if (createIfNotExists === false && !roomManager.hasRoom(roomId)) {
+        socket.emit('error', {
+          message: `Room '${roomId}' does not exist`,
+          code: 'ROOM_NOT_FOUND',
+        });
+        return;
+      }
+
+      const room = roomManager.joinRoom(socket.id, roomId, createIfNotExists !== false);
       clientInfo.roomId = roomId;
 
       // Get complete canvas state for new user
@@ -478,6 +486,75 @@ io.on('connection', (socket) => {
         message: 'Failed to synchronize state',
         code: 'STATE_SYNC_ERROR',
         timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  socket.on('request-room-list', () => {
+    try {
+      const roomStats = roomManager.getRoomStats();
+      const roomList = roomStats.rooms.map((room) => ({
+        id: room.id,
+        clientCount: room.clientCount,
+        stateStats: room.stateStats,
+      }));
+
+      socket.emit('room-list', {
+        rooms: roomList,
+        totalRooms: roomStats.totalRooms,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(
+        `[${new Date().toISOString()}] Sent room list to ${socket.id}: ${roomList.length} rooms`,
+      );
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error processing room list request from ${socket.id}:`,
+        error,
+      );
+      socket.emit('error', {
+        message: 'Failed to get room list',
+        code: 'ROOM_LIST_ERROR',
+      });
+    }
+  });
+
+  socket.on('request-room-info', (data) => {
+    try {
+      const { roomId } = data;
+      if (!roomId || typeof roomId !== 'string') {
+        socket.emit('error', { message: 'Invalid room ID', code: 'INVALID_ROOM_ID' });
+        return;
+      }
+
+      const room = roomManager.getRoom(roomId);
+      if (!room) {
+        socket.emit('room-info', {
+          exists: false,
+          roomId,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      socket.emit('room-info', {
+        exists: true,
+        roomId: room.id,
+        clientCount: room.getClientCount(),
+        stateStats: room.stateManager.getStateStats(),
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`[${new Date().toISOString()}] Sent room info for ${roomId} to ${socket.id}`);
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error processing room info request from ${socket.id}:`,
+        error,
+      );
+      socket.emit('error', {
+        message: 'Failed to get room info',
+        code: 'ROOM_INFO_ERROR',
       });
     }
   });

@@ -21,6 +21,68 @@
         <span id="status-indicator" class="status-indicator disconnected"></span>
         <span id="status-text">Connecting...</span>
       </div>
+      <div id="room-info" class="room-info">
+        <div class="room-info-header">
+          <i class="fas fa-door-open"></i>
+          <span id="current-room-name">default-room</span>
+          <span id="room-user-count" class="user-count"
+            ><i class="fa-solid fa-people-group"></i> 1</span
+          >
+        </div>
+        <button id="copy-room-url" class="icon-btn" title="Copy room link">
+          <i class="fas fa-link"></i>
+        </button>
+        <button id="toggle-room-panel" class="icon-btn" title="Room settings">
+          <i class="fas fa-cog"></i>
+        </button>
+      </div>
+      <div id="room-panel" class="room-panel hidden">
+        <div class="room-panel-header">
+          <h3>Room Management</h3>
+          <button id="close-room-panel" class="close-btn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="room-panel-section">
+          <h4>Create New Room</h4>
+          <div class="input-group">
+            <input
+              type="text"
+              id="new-room-name"
+              class="room-input"
+              placeholder="Enter room name..."
+              maxlength="30"
+            />
+            <button id="create-room-btn" class="action-btn">
+              <i class="fas fa-plus"></i> Create
+            </button>
+          </div>
+        </div>
+        <div class="room-panel-section">
+          <h4>Join Room</h4>
+          <div class="input-group">
+            <input
+              type="text"
+              id="join-room-name"
+              class="room-input"
+              placeholder="Enter room name to join..."
+              maxlength="30"
+            />
+            <button id="join-room-btn" class="action-btn">
+              <i class="fas fa-sign-in-alt"></i> Join
+            </button>
+          </div>
+        </div>
+        <div class="room-panel-section">
+          <h4>Available Rooms</h4>
+          <button id="refresh-rooms-btn" class="refresh-btn">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+          <div id="room-list" class="room-list">
+            <div class="room-list-empty">No rooms available</div>
+          </div>
+        </div>
+      </div>
       <div id="toolbar" class="toolbar">
         <div class="toolbar-section">
           <label for="tool-brush" class="tool-label">

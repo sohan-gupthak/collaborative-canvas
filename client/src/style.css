@@ -89,9 +89,257 @@ body {
   }
 }
 
-.toolbar {
+.room-info {
   position: absolute;
   top: 70px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  z-index: 110;
+}
+
+.room-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-info-header i {
+  color: #000000;
+  font-size: 16px;
+}
+
+#current-room-name {
+  font-weight: 600;
+  color: #333;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-count {
+  font-size: 12px;
+  color: #666;
+  padding: 2px 8px;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: #666;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background-color: #f0f0f0;
+  color: #007bff;
+}
+
+.room-panel {
+  position: absolute;
+  top: 120px;
+  left: 20px;
+  width: 320px;
+  max-height: calc(100vh - 140px);
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+}
+
+.room-panel.hidden {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.room-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #007bff;
+  color: white;
+}
+
+.room-panel-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.room-panel-section {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.room-panel-section:last-child {
+  border-bottom: none;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.room-panel-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.room-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.room-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  background-color: #0056b3;
+}
+
+.action-btn:active {
+  transform: translateY(1px);
+}
+
+.refresh-btn {
+  padding: 6px 12px;
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  background-color: #e9ecef;
+  border-color: #007bff;
+}
+
+.room-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.room-list-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.room-item {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.room-item:hover {
+  background-color: #e9ecef;
+  border-color: #007bff;
+}
+
+.room-item.active {
+  background-color: #e7f3ff;
+  border-color: #007bff;
+}
+
+.room-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.room-item-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.room-item-users {
+  font-size: 12px;
+  color: #666;
+}
+
+.room-item-info {
+  font-size: 12px;
+  color: #999;
+}
+
+.toolbar {
+  position: absolute;
+  margin-top: 12px;
+  top: 120px;
   left: 20px;
   background-color: rgba(255, 255, 255, 0.95);
   border-radius: 8px;
@@ -100,7 +348,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  z-index: 100;
+  z-index: 90;
   min-width: 200px;
 }
 

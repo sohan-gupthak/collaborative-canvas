@@ -46,6 +46,9 @@ export class WebSocketClient {
     errors?: string[];
   }) => void;
   private onCanvasClearedCallback?: (data: { userId: string; timestamp: string }) => void;
+  private onRoomListCallback?: (data: { rooms: any[]; totalRooms: number }) => void;
+  private onRoomInfoCallback?: (data: any) => void;
+  private onUserJoinedCallback?: (data: { userId: string; timestamp: string }) => void;
 
   constructor(private serverUrl: string = 'http://localhost:3001') {
     this.connectionState = {
@@ -127,7 +130,7 @@ export class WebSocketClient {
   }
 
   // joins a room on the server
-  private joinRoom(roomId: string): void {
+  private joinRoom(roomId: string, createIfNotExists: boolean = true): void {
     if (!this.socket || !this.socket.connected) {
       throw new Error('Cannot join room: not connected to server');
     }
@@ -135,6 +138,7 @@ export class WebSocketClient {
     this.socket.emit('join-room', {
       roomId,
       userId: this.connectionState.userId,
+      createIfNotExists,
     });
 
     this.connectionState.roomId = roomId;
@@ -231,6 +235,68 @@ export class WebSocketClient {
     });
   }
 
+  public requestRoomList(): void {
+    if (!this.socket || !this.socket.connected) {
+      console.warn('[WebSocketClient] Cannot request room list: not connected');
+      return;
+    }
+
+    this.socket.emit('request-room-list');
+  }
+
+  public requestRoomInfo(roomId: string): void {
+    if (!this.socket || !this.socket.connected) {
+      console.warn('[WebSocketClient] Cannot request room info: not connected');
+      return;
+    }
+
+    this.socket.emit('request-room-info', { roomId });
+  }
+
+  public async switchRoom(newRoomId: string, createIfNotExists: boolean = true): Promise<void> {
+    if (!this.socket || !this.socket.connected) {
+      throw new Error('Cannot switch room: not connected');
+    }
+
+    const socket = this.socket; // reference for closure
+
+    return new Promise((resolve, reject) => {
+      const errorHandler = (error: any) => {
+        if (error.code === 'ROOM_NOT_FOUND') {
+          socket.off('error', errorHandler);
+          socket.off('room-joined', successHandler);
+          reject(new Error(error.message));
+        }
+      };
+
+      const successHandler = () => {
+        socket.off('error', errorHandler);
+        socket.off('room-joined', successHandler);
+        resolve();
+      };
+
+      socket.once('error', errorHandler);
+      socket.once('room-joined', successHandler);
+
+      socket.emit('leave-room');
+
+      socket.emit('join-room', {
+        roomId: newRoomId,
+        userId: this.connectionState.userId,
+        createIfNotExists,
+      });
+
+      this.connectionState.roomId = newRoomId;
+      console.log(`[WebSocketClient] Switching to room: ${newRoomId}`);
+
+      setTimeout(() => {
+        socket.off('error', errorHandler);
+        socket.off('room-joined', successHandler);
+        reject(new Error('Room switch timeout'));
+      }, 5000);
+    });
+  }
+
   private setupSocketEventListeners(): void {
     if (!this.socket) return;
 
@@ -293,6 +359,27 @@ export class WebSocketClient {
       console.log(`[WebSocketClient] Canvas cleared:`, data);
       if (this.onCanvasClearedCallback) {
         this.onCanvasClearedCallback(data);
+      }
+    });
+
+    this.socket.on('room-list', (data: any) => {
+      console.log(`[WebSocketClient] Received room list:`, data);
+      if (this.onRoomListCallback) {
+        this.onRoomListCallback(data);
+      }
+    });
+
+    this.socket.on('room-info', (data: any) => {
+      console.log(`[WebSocketClient] Received room info:`, data);
+      if (this.onRoomInfoCallback) {
+        this.onRoomInfoCallback(data);
+      }
+    });
+
+    this.socket.on('user-joined', (data: any) => {
+      console.log(`[WebSocketClient] User joined room:`, data);
+      if (this.onUserJoinedCallback) {
+        this.onUserJoinedCallback(data);
       }
     });
 
@@ -381,6 +468,18 @@ export class WebSocketClient {
 
   public onCanvasCleared(callback: (data: { userId: string; timestamp: string }) => void): void {
     this.onCanvasClearedCallback = callback;
+  }
+
+  public onRoomList(callback: (data: { rooms: any[]; totalRooms: number }) => void): void {
+    this.onRoomListCallback = callback;
+  }
+
+  public onRoomInfo(callback: (data: any) => void): void {
+    this.onRoomInfoCallback = callback;
+  }
+
+  public onUserJoined(callback: (data: { userId: string; timestamp: string }) => void): void {
+    this.onUserJoinedCallback = callback;
   }
 
   // Getters

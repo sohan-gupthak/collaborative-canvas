@@ -114,6 +114,26 @@ canvas.setOnCursorEvent((cursor) => {
   }
 });
 
+wsClient.onConnectionState((state) => {
+  isConnected = state.isConnected;
+
+  if (state.isConnected) {
+    updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
+    console.log('Connected to WebSocket server, room:', state.roomId);
+
+    canvas.setUserContext(state.userId, state.roomId || roomId);
+    updateUndoRedoButtons();
+
+    if (state.roomId) {
+      wsClient.requestRoomInfo(state.roomId);
+    }
+  } else {
+    updateConnectionStatus(false, state.lastError || 'Disconnected');
+    console.log('Disconnected from WebSocket server');
+    updateUndoRedoButtons();
+  }
+});
+
 // connection starts here
 async function initializeConnection() {
   try {
@@ -242,21 +262,169 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-wsClient.onConnectionState((state) => {
-  isConnected = state.isConnected;
+// Room Management UI
+const roomPanel = document.getElementById('room-panel') as HTMLElement;
+const toggleRoomPanelBtn = document.getElementById('toggle-room-panel') as HTMLButtonElement;
+const closeRoomPanelBtn = document.getElementById('close-room-panel') as HTMLButtonElement;
+const createRoomBtn = document.getElementById('create-room-btn') as HTMLButtonElement;
+const joinRoomBtn = document.getElementById('join-room-btn') as HTMLButtonElement;
+const newRoomNameInput = document.getElementById('new-room-name') as HTMLInputElement;
+const joinRoomNameInput = document.getElementById('join-room-name') as HTMLInputElement;
+const refreshRoomsBtn = document.getElementById('refresh-rooms-btn') as HTMLButtonElement;
+const roomListElement = document.getElementById('room-list') as HTMLElement;
+const currentRoomNameElement = document.getElementById('current-room-name') as HTMLElement;
+const roomUserCountElement = document.getElementById('room-user-count') as HTMLElement;
+const copyRoomUrlBtn = document.getElementById('copy-room-url') as HTMLButtonElement;
 
-  if (state.isConnected) {
-    updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
-    console.log('Connected to WebSocket server, room:', state.roomId);
+if (toggleRoomPanelBtn) {
+  toggleRoomPanelBtn.addEventListener('click', () => {
+    roomPanel?.classList.toggle('hidden');
+    if (!roomPanel?.classList.contains('hidden')) {
+      wsClient.requestRoomList();
+    }
+  });
+}
 
-    canvas.setUserContext(state.userId, state.roomId || roomId);
-    updateUndoRedoButtons();
-  } else {
-    updateConnectionStatus(false, state.lastError || 'Disconnected');
-    console.log('Disconnected from WebSocket server');
-    updateUndoRedoButtons();
+if (closeRoomPanelBtn) {
+  closeRoomPanelBtn.addEventListener('click', () => {
+    roomPanel?.classList.add('hidden');
+  });
+}
+
+if (createRoomBtn && newRoomNameInput) {
+  createRoomBtn.addEventListener('click', async () => {
+    const roomName = newRoomNameInput.value.trim();
+    if (!roomName) {
+      alert('Please enter a room name');
+      return;
+    }
+
+    try {
+      await wsClient.switchRoom(roomName);
+      newRoomNameInput.value = '';
+      roomPanel?.classList.add('hidden');
+      window.history.pushState({}, '', `?room=${encodeURIComponent(roomName)}`);
+      location.reload(); // Reload to reinitialize with new room
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      alert('Failed to create room');
+    }
+  });
+
+  newRoomNameInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+      createRoomBtn.click();
+    }
+  });
+}
+
+if (joinRoomBtn && joinRoomNameInput) {
+  joinRoomBtn.addEventListener('click', async () => {
+    const roomName = joinRoomNameInput.value.trim();
+    if (!roomName) {
+      alert('Please enter a room name');
+      return;
+    }
+
+    try {
+      await wsClient.switchRoom(roomName, false); // Don't create if doesn't exist
+      joinRoomNameInput.value = '';
+      roomPanel?.classList.add('hidden');
+      window.history.pushState({}, '', `?room=${encodeURIComponent(roomName)}`);
+      location.reload(); // Reload to reinitialize with new room
+    } catch (error) {
+      console.error('Failed to join room:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to join room';
+      alert(errorMessage);
+    }
+  });
+
+  joinRoomNameInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+      joinRoomBtn.click();
+    }
+  });
+}
+
+if (refreshRoomsBtn) {
+  refreshRoomsBtn.addEventListener('click', () => {
+    wsClient.requestRoomList();
+  });
+}
+
+if (copyRoomUrlBtn) {
+  copyRoomUrlBtn.addEventListener('click', async () => {
+    const roomUrl = window.location.href;
+    try {
+      await navigator.clipboard.writeText(roomUrl);
+      const icon = copyRoomUrlBtn.querySelector('i');
+      if (icon) {
+        icon.className = 'fas fa-check';
+        setTimeout(() => {
+          icon.className = 'fas fa-link';
+        }, 2000);
+      }
+      console.log('Room URL copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy room URL:', error);
+      alert('Failed to copy URL');
+    }
+  });
+}
+
+wsClient.onRoomList((data) => {
+  if (!roomListElement) return;
+
+  if (data.rooms.length === 0) {
+    roomListElement.innerHTML = '<div class="room-list-empty">No rooms available</div>';
+    return;
+  }
+
+  roomListElement.innerHTML = data.rooms
+    .map(
+      (room) => `
+    <div class="room-item ${room.id === roomId ? 'active' : ''}" data-room-id="${room.id}">
+      <div class="room-item-header">
+        <span class="room-item-name">${room.id}</span>
+        <span class="room-item-users"><i class="fa-solid fa-people-group"></i> ${room.clientCount}</span>
+      </div>
+      <div class="room-item-info">${room.stateStats.historySize} drawings</div>
+    </div>
+  `,
+    )
+    .join('');
+
+  roomListElement.querySelectorAll('.room-item').forEach((item) => {
+    item.addEventListener('click', async () => {
+      const targetRoomId = item.getAttribute('data-room-id');
+      if (targetRoomId && targetRoomId !== roomId) {
+        try {
+          await wsClient.switchRoom(targetRoomId);
+          window.history.pushState({}, '', `?room=${encodeURIComponent(targetRoomId)}`);
+          location.reload();
+        } catch (error) {
+          console.error('Failed to switch room:', error);
+        }
+      }
+    });
+  });
+});
+
+wsClient.onUserJoined((data) => {
+  console.log('New user joined room:', data.userId);
+  // Update user count
+  wsClient.requestRoomInfo(roomId);
+});
+
+wsClient.onRoomInfo((data) => {
+  if (data.exists && roomUserCountElement) {
+    roomUserCountElement.innerHTML = `<i class="fa-solid fa-people-group"></i> ${data.clientCount}`;
   }
 });
+
+if (currentRoomNameElement) {
+  currentRoomNameElement.textContent = roomId;
+}
 
 window.addEventListener('beforeunload', () => {
   wsClient.disconnect();
