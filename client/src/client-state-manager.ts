@@ -7,6 +7,15 @@ export interface CanvasState {
   version: number;
 }
 
+export interface MemoryStats {
+  estimatedSizeBytes: number;
+  estimatedSizeMB: number;
+  drawingEventsCount: number;
+  undoStackSize: number;
+  redoStackSize: number;
+  totalPoints: number;
+}
+
 export interface StateSyncData {
   roomId: string;
   canvasState: CanvasState;
@@ -27,6 +36,11 @@ export class ClientStateManager {
   private roomId: string | null = null;
   private onStateReconstructedCallback?: (events: DrawingEvent[]) => void;
   private onStateValidationFailedCallback?: (errors: string[]) => void;
+
+  private readonly MAX_MEMORY_MB = 50; // Maximum memory before garbage collection
+  private readonly MAX_DRAWING_EVENTS = 5000; // Maximum number of drawing events
+  private readonly MAX_UNDO_STACK_SIZE = 100; // Maximum undo history
+  private readonly MAX_REDO_STACK_SIZE = 100; // Maximum redo history
 
   constructor() {
     this.currentState = {
@@ -198,6 +212,9 @@ export class ClientStateManager {
 
     this.currentState.version++;
 
+    // Perform garbage collection if needed
+    this.performGarbageCollection();
+
     console.log(
       `[ClientStateManager] Added drawing event locally, version ${this.currentState.version}`,
     );
@@ -310,6 +327,111 @@ export class ClientStateManager {
         this.currentState.drawingEvents.length > 0
           ? this.currentState.drawingEvents[this.currentState.drawingEvents.length - 1].timestamp
           : null,
+    };
+  }
+
+  private performGarbageCollection(): void {
+    const memoryStats = this.getMemoryStats();
+    let cleanupPerformed = false;
+
+    if (memoryStats.estimatedSizeMB > this.MAX_MEMORY_MB) {
+      console.warn(
+        `[ClientStateManager] Memory threshold exceeded: ${memoryStats.estimatedSizeMB}MB > ${this.MAX_MEMORY_MB}MB`,
+      );
+      cleanupPerformed = true;
+    }
+
+    if (this.currentState.drawingEvents.length > this.MAX_DRAWING_EVENTS) {
+      console.warn(
+        `[ClientStateManager] Drawing events limit exceeded: ${this.currentState.drawingEvents.length} > ${this.MAX_DRAWING_EVENTS}`,
+      );
+      cleanupPerformed = true;
+    }
+
+    if (cleanupPerformed) {
+      // Remove oldest 25% of drawing events
+      const eventsToRemove = Math.floor(this.currentState.drawingEvents.length * 0.25);
+      const removedEvents = this.currentState.drawingEvents.splice(0, eventsToRemove);
+
+      console.log(
+        `[ClientStateManager] Garbage collection: removed ${removedEvents.length} old drawing events`,
+      );
+    }
+
+    if (this.currentState.undoStack.length > this.MAX_UNDO_STACK_SIZE) {
+      const excess = this.currentState.undoStack.length - this.MAX_UNDO_STACK_SIZE;
+      this.currentState.undoStack.splice(0, excess);
+      console.log(
+        `[ClientStateManager] Garbage collection: trimmed ${excess} events from undo stack`,
+      );
+    }
+
+    if (this.currentState.redoStack.length > this.MAX_REDO_STACK_SIZE) {
+      const excess = this.currentState.redoStack.length - this.MAX_REDO_STACK_SIZE;
+      this.currentState.redoStack.splice(0, excess);
+      console.log(
+        `[ClientStateManager] Garbage collection: trimmed ${excess} events from redo stack`,
+      );
+    }
+
+    if (cleanupPerformed) {
+      const newStats = this.getMemoryStats();
+      console.log(
+        `[ClientStateManager] Garbage collection complete: ${memoryStats.estimatedSizeMB}MB -> ${newStats.estimatedSizeMB}MB`,
+      );
+    }
+  }
+
+  // Calculate estimated memory usage
+  public getMemoryStats(): MemoryStats {
+    const estimateEventSize = (event: DrawingEvent): number => {
+      let size = 100;
+
+      // Points array (each point has x, y, timestamp)
+      size += event.points.length * (8 + 8 + 8); // 3 numbers per point
+
+      // Strings (estimate 2 bytes per character)
+      size += (event.type?.length || 0) * 2;
+      size += (event.userId?.length || 0) * 2;
+      size += (event.roomId?.length || 0) * 2;
+      size += (event.strokeId?.length || 0) * 2;
+      size += (event.style?.color?.length || 0) * 2;
+
+      return size;
+    };
+
+    const countTotalPoints = (events: DrawingEvent[]): number => {
+      return events.reduce((total, event) => total + event.points.length, 0);
+    };
+
+    const drawingEventsSize = this.currentState.drawingEvents.reduce(
+      (total, event) => total + estimateEventSize(event),
+      0,
+    );
+    const undoStackSize = this.currentState.undoStack.reduce(
+      (total, event) => total + estimateEventSize(event),
+      0,
+    );
+    const redoStackSize = this.currentState.redoStack.reduce(
+      (total, event) => total + estimateEventSize(event),
+      0,
+    );
+
+    const totalBytes = drawingEventsSize + undoStackSize + redoStackSize;
+    const totalMB = totalBytes / (1024 * 1024);
+
+    const totalPoints =
+      countTotalPoints(this.currentState.drawingEvents) +
+      countTotalPoints(this.currentState.undoStack) +
+      countTotalPoints(this.currentState.redoStack);
+
+    return {
+      estimatedSizeBytes: totalBytes,
+      estimatedSizeMB: parseFloat(totalMB.toFixed(2)),
+      drawingEventsCount: this.currentState.drawingEvents.length,
+      undoStackSize: this.currentState.undoStack.length,
+      redoStackSize: this.currentState.redoStack.length,
+      totalPoints: totalPoints,
     };
   }
 }

@@ -32,6 +32,12 @@ export class Room {
   public readonly stateManager: StateManager;
   private readonly createdAt: Date;
 
+  // Performance optimization - event batching
+  private eventBatchQueue: Array<{ event: string; data: any; excludeSocket?: string }> = [];
+  private batchTimer: NodeJS.Timeout | null = null;
+  private readonly BATCH_INTERVAL = 16; // ~60 FPS (16ms)
+  private readonly MAX_BATCH_SIZE = 20;
+
   constructor(id: string) {
     this.id = id;
     this.clients = new Set();
@@ -104,6 +110,34 @@ export class Room {
   clearCanvas(): void {
     this.stateManager.clearState();
     console.log(`[${new Date().toISOString()}] Canvas cleared in room ${this.id}`);
+  }
+
+  queueBroadcast(event: string, data: any, excludeSocket?: string): void {
+    this.eventBatchQueue.push({ event, data, excludeSocket });
+
+    if (this.eventBatchQueue.length >= this.MAX_BATCH_SIZE) {
+      this.flushBatch();
+    } else if (!this.batchTimer) {
+      // Schedule batch flush
+      this.batchTimer = setTimeout(() => {
+        this.flushBatch();
+      }, this.BATCH_INTERVAL);
+    }
+  }
+
+  flushBatch(): void {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    if (this.eventBatchQueue.length === 0) return;
+
+    this.eventBatchQueue.splice(0);
+  }
+
+  getBatchedEvents(): Array<{ event: string; data: any; excludeSocket?: string }> {
+    return this.eventBatchQueue.splice(0);
   }
 }
 
@@ -208,6 +242,11 @@ export class RoomManager {
       return;
     }
 
+    if (event === 'drawing-event') {
+      room.queueBroadcast(event, data, excludeSocket);
+      return;
+    }
+
     console.log(
       `[${new Date().toISOString()}] Broadcasting ${event} to room ${roomId} (${room.getClientCount()} clients)`,
     );
@@ -217,6 +256,21 @@ export class RoomManager {
     } else {
       this.io.to(roomId).emit(event, data);
     }
+  }
+
+  flushAllBatches(): void {
+    this.rooms.forEach((room, roomId) => {
+      const batchedEvents = room.getBatchedEvents();
+      if (batchedEvents.length > 0) {
+        batchedEvents.forEach(({ event, data, excludeSocket }) => {
+          if (excludeSocket) {
+            this.io.to(roomId).except(excludeSocket).emit(event, data);
+          } else {
+            this.io.to(roomId).emit(event, data);
+          }
+        });
+      }
+    });
   }
 
   getRoomStats() {

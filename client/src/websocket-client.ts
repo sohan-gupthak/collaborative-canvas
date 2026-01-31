@@ -17,12 +17,30 @@ export interface ConnectionState {
   lastError: string | null;
 }
 
+export interface ConnectionHealth {
+  latency: number; // Average latency in ms
+  quality: 'excellent' | 'good' | 'fair' | 'poor';
+  packetLoss: number; // Percentage 0-100
+  lastPingTime: number;
+}
+
 export class WebSocketClient {
   private socket: Socket | null = null;
   private connectionState: ConnectionState;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000; // Start with 1 second
+
+  private connectionHealth: ConnectionHealth = {
+    latency: 0,
+    quality: 'good',
+    packetLoss: 0,
+    lastPingTime: 0,
+  };
+  private pingTimes: number[] = [];
+  private readonly MAX_PING_SAMPLES = 10;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private readonly HEALTH_CHECK_INTERVAL = 5000;
 
   // Event callbacks
   private onDrawingEventCallback?: (event: DrawingEvent) => void;
@@ -84,6 +102,7 @@ export class WebSocketClient {
 
           this.joinRoom(roomId);
           this.notifyConnectionStateChange();
+          this.startHealthMonitoring();
           resolve();
         });
 
@@ -117,6 +136,8 @@ export class WebSocketClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+
+    this.stopHealthMonitoring();
 
     if (this.socket) {
       this.socket.disconnect();
@@ -497,5 +518,76 @@ export class WebSocketClient {
 
   public getUserId(): string {
     return this.connectionState.userId;
+  }
+
+  public getConnectionHealth(): ConnectionHealth {
+    return { ...this.connectionHealth };
+  }
+
+  private startHealthMonitoring(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    this.healthCheckInterval = setInterval(() => {
+      this.performHealthCheck();
+    }, this.HEALTH_CHECK_INTERVAL);
+  }
+
+  private stopHealthMonitoring(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  private performHealthCheck(): void {
+    if (!this.socket || !this.socket.connected) {
+      this.connectionHealth.quality = 'poor';
+      return;
+    }
+
+    const startTime = Date.now();
+
+    this.socket.emit('ping', { timestamp: startTime });
+
+    const pongListener = (data: { timestamp: number }) => {
+      const latency = Date.now() - data.timestamp;
+      this.recordLatency(latency);
+      this.updateConnectionQuality();
+    };
+
+    this.socket.once('pong', pongListener);
+
+    setTimeout(() => {
+      this.socket?.off('pong', pongListener);
+    }, 1000);
+  }
+
+  private recordLatency(latency: number): void {
+    this.pingTimes.push(latency);
+
+    if (this.pingTimes.length > this.MAX_PING_SAMPLES) {
+      this.pingTimes.shift();
+    }
+
+    // Calculate average latency
+    const sum = this.pingTimes.reduce((a, b) => a + b, 0);
+    this.connectionHealth.latency = Math.round(sum / this.pingTimes.length);
+    this.connectionHealth.lastPingTime = Date.now();
+  }
+
+  private updateConnectionQuality(): void {
+    const latency = this.connectionHealth.latency;
+
+    if (latency < 50) {
+      this.connectionHealth.quality = 'excellent';
+    } else if (latency < 100) {
+      this.connectionHealth.quality = 'good';
+    } else if (latency < 200) {
+      this.connectionHealth.quality = 'fair';
+    } else {
+      this.connectionHealth.quality = 'poor';
+    }
   }
 }

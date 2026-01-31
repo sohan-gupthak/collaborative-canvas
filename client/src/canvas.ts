@@ -34,6 +34,15 @@ export class Canvas {
   private ghostCursors: Map<string, CursorEvent> = new Map();
   private userColors: Map<string, string> = new Map();
 
+  private eventBatchQueue: DrawingEvent[] = [];
+  private batchTimer: NodeJS.Timeout | null = null;
+  private batchInterval = 16; // ~60 FPS (16ms) - adaptive
+  private readonly MAX_BATCH_SIZE = 10;
+  private lastEmitTime = 0;
+  private minEmitInterval = 16; // Throttle to 60 events/second - adaptive
+
+  private connectionQuality: 'excellent' | 'good' | 'fair' | 'poor' = 'good';
+
   constructor(canvasElement: HTMLCanvasElement) {
     this.canvas = canvasElement;
     const context = this.canvas.getContext('2d');
@@ -182,6 +191,7 @@ export class Canvas {
   public clearCanvas(): void {
     const dimensions = this.getDimensions();
     this.renderer.clearCanvas(dimensions.width, dimensions.height);
+    this.renderer.clearAllEvents();
   }
 
   public getDimensions(): { width: number; height: number } {
@@ -351,7 +361,44 @@ export class Canvas {
       this.currentStrokeId || undefined,
     );
 
-    this.onDrawingEventCallback(event);
+    const now = Date.now();
+    const timeSinceLastEmit = now - this.lastEmitTime;
+
+    if (type === 'start' || type === 'end') {
+      this.flushEventBatch();
+      this.onDrawingEventCallback(event);
+      this.lastEmitTime = now;
+      return;
+    }
+
+    if (type === 'line') {
+      this.eventBatchQueue.push(event);
+
+      if (timeSinceLastEmit >= this.minEmitInterval) {
+        this.flushEventBatch();
+      } else if (this.eventBatchQueue.length >= this.MAX_BATCH_SIZE) {
+        this.flushEventBatch();
+      } else if (!this.batchTimer) {
+        this.batchTimer = setTimeout(() => {
+          this.flushEventBatch();
+        }, this.batchInterval);
+      }
+    }
+  }
+
+  private flushEventBatch(): void {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    if (this.eventBatchQueue.length > 0 && this.onDrawingEventCallback) {
+      this.eventBatchQueue.forEach((event) => {
+        this.onDrawingEventCallback!(event);
+      });
+      this.eventBatchQueue = [];
+      this.lastEmitTime = Date.now();
+    }
   }
 
   private generateStrokeId(): string {
@@ -457,5 +504,34 @@ export class Canvas {
   private handleTouchEnd(event: TouchEvent): void {
     event.preventDefault();
     this.endDrawing();
+  }
+
+  public updateConnectionQuality(quality: 'excellent' | 'good' | 'fair' | 'poor'): void {
+    if (this.connectionQuality === quality) return; // No change
+
+    this.connectionQuality = quality;
+
+    switch (quality) {
+      case 'excellent':
+        this.minEmitInterval = 8; // ~120 FPS for excellent connections
+        this.batchInterval = 8;
+        break;
+      case 'good':
+        this.minEmitInterval = 16; // ~60 FPS for good connections
+        this.batchInterval = 16;
+        break;
+      case 'fair':
+        this.minEmitInterval = 24; // ~40 FPS for fair connections
+        this.batchInterval = 24;
+        break;
+      case 'poor':
+        this.minEmitInterval = 32; // ~30 FPS for poor connections
+        this.batchInterval = 32;
+        break;
+    }
+
+    console.log(
+      `Adjusted event frequency for ${this.connectionQuality} connection: ${this.minEmitInterval}ms interval`,
+    );
   }
 }

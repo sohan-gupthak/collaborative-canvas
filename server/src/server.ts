@@ -118,6 +118,11 @@ const io = new Server(server, {
 
 const roomManager = new RoomManager(io);
 
+// Performance optimization - flush batched events every 16ms (~60 FPS)
+setInterval(() => {
+  roomManager.flushAllBatches();
+}, 16);
+
 app.use(
   cors({
     origin: allowedOrigins,
@@ -583,6 +588,10 @@ io.on('connection', (socket) => {
         code: 'ROOM_INFO_ERROR',
       });
     }
+  });
+
+  socket.on('ping', (data: { timestamp: number }) => {
+    socket.emit('pong', { timestamp: data.timestamp });
   });
 
   socket.on('error', (error) => {

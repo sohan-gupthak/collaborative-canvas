@@ -2,6 +2,7 @@ import { Canvas } from './canvas.js';
 import { WebSocketClient } from './websocket-client.js';
 import { DrawingEvent } from './drawing-events.js';
 import { ClientStateManager } from './client-state-manager.js';
+import { PerformanceMonitor } from './performance-monitor.js';
 
 console.log('Collaborative Drawing Canvas - Client Starting...');
 
@@ -19,6 +20,9 @@ const wsClient = new WebSocketClient(import.meta.env.VITE_SERVER_URL || 'http://
 
 // Client state manager instance
 const stateManager = new ClientStateManager();
+
+// Performance monitor instance
+const perfMonitor = new PerformanceMonitor();
 
 // Get room ID from URL or use default one
 const urlParams = new URLSearchParams(window.location.search);
@@ -95,6 +99,8 @@ stateManager.onStateValidationFailed((errors: string[]) => {
 canvas.setOnDrawingEvent((event: DrawingEvent) => {
   console.log('Local drawing event:', event.type);
 
+  perfMonitor.recordEvent();
+
   stateManager.addDrawingEvent(event);
 
   if (isConnected) {
@@ -133,6 +139,36 @@ wsClient.onConnectionState((state) => {
     updateUndoRedoButtons();
   }
 });
+
+setInterval(() => {
+  if (isConnected) {
+    const health = wsClient.getConnectionHealth();
+    canvas.updateConnectionQuality(health.quality);
+  }
+}, 5000);
+
+perfMonitor.onMetricsUpdate((metrics) => {
+  const memoryStats = stateManager.getMemoryStats();
+  const health = wsClient.getConnectionHealth();
+
+  console.log('=== Performance Report ===');
+  console.log(
+    `FPS: ${metrics.fps} | Frame Time: ${metrics.averageFrameTime}ms | Dropped: ${metrics.droppedFrames}`,
+  );
+  console.log(`Events: ${metrics.totalEvents} | Processing: ${metrics.eventProcessingTime}ms`);
+  console.log(`Memory: ${memoryStats.estimatedSizeMB}MB (${memoryStats.totalPoints} points)`);
+  console.log(`Network: ${health.latency}ms latency (${health.quality})`);
+  console.log(
+    `State: ${memoryStats.drawingEventsCount} events | Undo: ${memoryStats.undoStackSize} | Redo: ${memoryStats.redoStackSize}`,
+  );
+  console.log('=========================');
+});
+
+function animationLoop() {
+  perfMonitor.recordFrame();
+  requestAnimationFrame(animationLoop);
+}
+animationLoop();
 
 // connection starts here
 async function initializeConnection() {
@@ -427,6 +463,7 @@ if (currentRoomNameElement) {
 }
 
 window.addEventListener('beforeunload', () => {
+  perfMonitor.stopMonitoring();
   wsClient.disconnect();
 });
 

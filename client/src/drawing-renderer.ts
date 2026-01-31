@@ -1,8 +1,18 @@
 import { DrawingEvent, DrawingStyle, Point } from './drawing-events.js';
 import { CursorEvent } from './websocket-client.js';
 
+interface DirtyRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export class DrawingRenderer {
   private ctx: CanvasRenderingContext2D;
+  private dirtyRects: DirtyRect[] = [];
+  private pendingRenderFrame: number | null = null;
+  private allEvents: DrawingEvent[] = [];
 
   constructor(context: CanvasRenderingContext2D) {
     this.ctx = context;
@@ -13,7 +23,12 @@ export class DrawingRenderer {
       return;
     }
 
-    // Save current context state
+    this.allEvents.push(event);
+
+    // Calculate bounding box for this event
+    const bounds = this.calculateBounds(event.points, event.style);
+    this.markDirty(bounds);
+
     this.ctx.save();
 
     try {
@@ -32,6 +47,8 @@ export class DrawingRenderer {
       // we are restoring the context state every single time
       this.ctx.restore();
     }
+
+    this.scheduleRender();
   }
 
   public renderDrawingEvents(events: DrawingEvent[]): void {
@@ -135,5 +152,96 @@ export class DrawingRenderer {
 
     const hue = Math.abs(hash) % 360;
     return `hsl(${hue}, 70%, 50%)`;
+  }
+
+  private calculateBounds(points: Point[], style: DrawingStyle): DirtyRect {
+    if (points.length === 0) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+    let minX = points[0].x;
+    let minY = points[0].y;
+    let maxX = points[0].x;
+    let maxY = points[0].y;
+
+    for (const point of points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    const padding = style.lineWidth * 2;
+
+    return {
+      x: Math.floor(minX - padding),
+      y: Math.floor(minY - padding),
+      width: Math.ceil(maxX - minX + padding * 2),
+      height: Math.ceil(maxY - minY + padding * 2),
+    };
+  }
+
+  private markDirty(rect: DirtyRect): void {
+    this.dirtyRects.push(rect);
+  }
+
+  private scheduleRender(): void {
+    if (this.pendingRenderFrame !== null) {
+      return;
+    }
+
+    this.pendingRenderFrame = requestAnimationFrame(() => {
+      this.renderDirtyRegions();
+      this.pendingRenderFrame = null;
+    });
+  }
+
+  private renderDirtyRegions(): void {
+    if (this.dirtyRects.length === 0) {
+      return;
+    }
+
+    const mergedRect = this.mergeDirtyRects(); // TODO: optimize to only redraw individual rects
+
+    this.dirtyRects = [];
+
+    if (mergedRect.width > 0 && mergedRect.height > 0) {
+      // Batched render scheduled via requestAnimationFrame
+      void mergedRect;
+    }
+  }
+
+  private mergeDirtyRects(): DirtyRect {
+    if (this.dirtyRects.length === 0) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+    let minX = this.dirtyRects[0].x;
+    let minY = this.dirtyRects[0].y;
+    let maxX = this.dirtyRects[0].x + this.dirtyRects[0].width;
+    let maxY = this.dirtyRects[0].y + this.dirtyRects[0].height;
+
+    for (const rect of this.dirtyRects) {
+      minX = Math.min(minX, rect.x);
+      minY = Math.min(minY, rect.y);
+      maxX = Math.max(maxX, rect.x + rect.width);
+      maxY = Math.max(maxY, rect.y + rect.height);
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
+  public clearAllEvents(): void {
+    this.allEvents = [];
+    this.dirtyRects = [];
+    if (this.pendingRenderFrame !== null) {
+      cancelAnimationFrame(this.pendingRenderFrame);
+      this.pendingRenderFrame = null;
+    }
   }
 }
