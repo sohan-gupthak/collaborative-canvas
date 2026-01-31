@@ -121,7 +121,7 @@ const roomManager = new RoomManager(io);
 // Performance optimization - flush batched events every 16ms (~60 FPS)
 setInterval(() => {
   roomManager.flushAllBatches();
-}, 16);
+}, 8);
 
 app.use(
   cors({

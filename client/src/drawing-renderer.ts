@@ -13,6 +13,7 @@ export class DrawingRenderer {
   private dirtyRects: DirtyRect[] = [];
   private pendingRenderFrame: number | null = null;
   private allEvents: DrawingEvent[] = [];
+  private strokeLastPoints: Map<string, Point> = new Map();
 
   constructor(context: CanvasRenderingContext2D) {
     this.ctx = context;
@@ -36,15 +37,52 @@ export class DrawingRenderer {
 
       this.ctx.beginPath();
 
-      if (event.points.length === 1) {
-        // Single point - draw a small circle
-        this.renderSinglePoint(event.points[0], event.style);
+      if (event.type === 'line' && event.strokeId) {
+        const lastPoint = this.strokeLastPoints.get(event.strokeId);
+        if (lastPoint) {
+          this.ctx.moveTo(lastPoint.x, lastPoint.y);
+          event.points.forEach((point) => {
+            this.ctx.lineTo(point.x, point.y);
+          });
+          this.ctx.stroke();
+          this.strokeLastPoints.set(event.strokeId, event.points[event.points.length - 1]);
+        } else {
+          if (event.points.length === 1) {
+            this.renderSinglePoint(event.points[0], event.style);
+          } else {
+            this.renderMultiplePoints(event.points);
+          }
+          this.strokeLastPoints.set(event.strokeId, event.points[event.points.length - 1]);
+        }
+      } else if (event.type === 'start' && event.strokeId) {
+        if (event.points.length === 1) {
+          this.renderSinglePoint(event.points[0], event.style);
+        } else {
+          this.renderMultiplePoints(event.points);
+        }
+        this.strokeLastPoints.set(event.strokeId, event.points[event.points.length - 1]);
+      } else if (event.type === 'end' && event.strokeId) {
+        const lastPoint = this.strokeLastPoints.get(event.strokeId);
+        if (lastPoint && event.points.length > 1) {
+          this.ctx.moveTo(lastPoint.x, lastPoint.y);
+          event.points.forEach((point) => {
+            this.ctx.lineTo(point.x, point.y);
+          });
+          this.ctx.stroke();
+        } else if (event.points.length === 1) {
+          this.renderSinglePoint(event.points[0], event.style);
+        } else {
+          this.renderMultiplePoints(event.points);
+        }
+        this.strokeLastPoints.delete(event.strokeId);
       } else {
-        // Multiple points - draw connected line segments
-        this.renderMultiplePoints(event.points);
+        if (event.points.length === 1) {
+          this.renderSinglePoint(event.points[0], event.style);
+        } else {
+          this.renderMultiplePoints(event.points);
+        }
       }
     } finally {
-      // we are restoring the context state every single time
       this.ctx.restore();
     }
 
@@ -239,6 +277,7 @@ export class DrawingRenderer {
   public clearAllEvents(): void {
     this.allEvents = [];
     this.dirtyRects = [];
+    this.strokeLastPoints.clear();
     if (this.pendingRenderFrame !== null) {
       cancelAnimationFrame(this.pendingRenderFrame);
       this.pendingRenderFrame = null;

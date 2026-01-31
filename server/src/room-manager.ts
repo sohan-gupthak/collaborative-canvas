@@ -35,8 +35,8 @@ export class Room {
   // Performance optimization - event batching
   private eventBatchQueue: Array<{ event: string; data: any; excludeSocket?: string }> = [];
   private batchTimer: NodeJS.Timeout | null = null;
-  private readonly BATCH_INTERVAL = 16; // ~60 FPS (16ms)
-  private readonly MAX_BATCH_SIZE = 20;
+  private readonly BATCH_INTERVAL = 8;
+  private readonly MAX_BATCH_SIZE = 10;
 
   constructor(id: string) {
     this.id = id;

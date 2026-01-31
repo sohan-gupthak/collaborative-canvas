@@ -31,6 +31,8 @@ export class Canvas {
   private lastCursorPosition: Point | null = null;
   private cursorActivityTimer: NodeJS.Timeout | null = null;
   private readonly CURSOR_INACTIVE_DELAY = 2000; // currently set to 2s
+  private lastCursorEmitTime = 0;
+  private readonly CURSOR_EMIT_INTERVAL = 50; // Throttle cursor to 20 updates/sec
   private ghostCursors: Map<string, CursorEvent> = new Map();
   private userColors: Map<string, string> = new Map();
 
@@ -374,14 +376,18 @@ export class Canvas {
     if (type === 'line') {
       this.eventBatchQueue.push(event);
 
-      if (timeSinceLastEmit >= this.minEmitInterval) {
-        this.flushEventBatch();
-      } else if (this.eventBatchQueue.length >= this.MAX_BATCH_SIZE) {
+      if (
+        timeSinceLastEmit >= this.minEmitInterval ||
+        this.eventBatchQueue.length >= this.MAX_BATCH_SIZE
+      ) {
         this.flushEventBatch();
       } else if (!this.batchTimer) {
-        this.batchTimer = setTimeout(() => {
-          this.flushEventBatch();
-        }, this.batchInterval);
+        this.batchTimer = setTimeout(
+          () => {
+            this.flushEventBatch();
+          },
+          Math.min(this.batchInterval, this.minEmitInterval - timeSinceLastEmit),
+        );
       }
     }
   }
@@ -423,20 +429,26 @@ export class Canvas {
   private emitCursorEvent(position: Point, isActive: boolean): void {
     if (!this.onCursorEventCallback) return;
 
-    const cursorEvent: CursorEvent = {
-      userId: this.userId,
-      roomId: this.roomId,
-      position: {
-        x: position.x,
-        y: position.y,
-        timestamp: position.timestamp,
-      },
-      isActive,
-      timestamp: Date.now(),
-    };
+    const now = Date.now();
+    const timeSinceLastEmit = now - this.lastCursorEmitTime;
 
-    this.onCursorEventCallback(cursorEvent);
-    this.lastCursorPosition = position;
+    if (!isActive || timeSinceLastEmit >= this.CURSOR_EMIT_INTERVAL) {
+      const cursorEvent: CursorEvent = {
+        userId: this.userId,
+        roomId: this.roomId,
+        position: {
+          x: position.x,
+          y: position.y,
+          timestamp: Date.now(),
+        },
+        isActive,
+        timestamp: Date.now(),
+      };
+
+      this.onCursorEventCallback(cursorEvent);
+      this.lastCursorPosition = position;
+      this.lastCursorEmitTime = now;
+    }
   }
 
   private handleCursorMovement(position: Point): void {
@@ -513,20 +525,20 @@ export class Canvas {
 
     switch (quality) {
       case 'excellent':
-        this.minEmitInterval = 8; // ~120 FPS for excellent connections
-        this.batchInterval = 8;
+        this.minEmitInterval = 5; // Very fast for excellent connections
+        this.batchInterval = 5;
         break;
       case 'good':
-        this.minEmitInterval = 16; // ~60 FPS for good connections
-        this.batchInterval = 16;
+        this.minEmitInterval = 8; // Fast for good connections
+        this.batchInterval = 8;
         break;
       case 'fair':
-        this.minEmitInterval = 24; // ~40 FPS for fair connections
-        this.batchInterval = 24;
+        this.minEmitInterval = 16; // Normal for fair connections
+        this.batchInterval = 16;
         break;
       case 'poor':
-        this.minEmitInterval = 32; // ~30 FPS for poor connections
-        this.batchInterval = 32;
+        this.minEmitInterval = 24; // Slower for poor connections
+        this.batchInterval = 24;
         break;
     }
 
