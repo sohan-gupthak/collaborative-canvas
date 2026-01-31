@@ -110,10 +110,10 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
-  allowEIO3: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  transports: ['websocket'],
+  pingInterval: 10000,
+  pingTimeout: 20000,
+  perMessageDeflate: false,
 });
 
 const roomManager = new RoomManager(io);

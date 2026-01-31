@@ -87,9 +87,12 @@ export class WebSocketClient {
         }
 
         this.socket = io(this.serverUrl, {
-          transports: ['websocket', 'polling'],
-          timeout: 5000,
-          reconnection: false, // currently we are handle reconnection manually
+          transports: ['websocket'],
+          upgrade: false,
+          timeout: 10000,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          secure: this.serverUrl.startsWith('https'),
         });
 
         this.setupSocketEventListeners();
