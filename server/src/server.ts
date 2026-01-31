@@ -105,17 +105,32 @@ const io = new Server(server, {
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.log('[Server] Origin rejected:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
 });
 
 const roomManager = new RoomManager(io);
 
-app.use(cors());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 // using Map to store the connected clients
