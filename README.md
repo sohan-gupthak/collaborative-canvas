@@ -1,4 +1,4 @@
-# Collaborative Drawing Canvas
+# Sketch Live - Collaborative Drawing Canvas
 
 A high-performance real-time collaborative drawing application built with TypeScript, Node.js, and Socket.io. Features include multi-user drawing sessions, room management, undo/redo operations, and comprehensive performance optimizations for smooth 60 FPS rendering.
 
@@ -134,7 +134,7 @@ The client will be available at the port specified in `client/.env` (default: `h
 - **Server**: Node.js, TypeScript, Express, Socket.io
 - **Real-time Communication**: WebSocket via Socket.io
 - **Performance**: requestAnimationFrame, dirty rectangle tracking, event batching
-- **Deployment**: Vercel (client), Render (server)
+- **Deployment**: Vercel (client), Railway (server)
 
 ## Performance Metrics
 
