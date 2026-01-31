@@ -195,45 +195,51 @@ initializeConnection();
 const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
 const redoBtn = document.getElementById('redo-btn') as HTMLButtonElement;
 const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
+const undoBtnDt = document.getElementById('undo-btn-dt') as HTMLButtonElement;
+const redoBtnDt = document.getElementById('redo-btn-dt') as HTMLButtonElement;
+const clearBtnDt = document.getElementById('clear-btn-dt') as HTMLButtonElement;
 
 function updateUndoRedoButtons() {
-  // For now, we are using enable/disable based on connection status
-  if (undoBtn && redoBtn) {
-    undoBtn.disabled = !isConnected;
-    redoBtn.disabled = !isConnected;
+  const disabled = !isConnected;
+
+  if (undoBtn) undoBtn.disabled = disabled;
+  if (redoBtn) redoBtn.disabled = disabled;
+  if (undoBtnDt) undoBtnDt.disabled = disabled;
+  if (redoBtnDt) redoBtnDt.disabled = disabled;
+}
+
+function handleUndo() {
+  if (isConnected) {
+    console.log('Undo button clicked');
+    wsClient.emitUndoRequest();
   }
 }
 
-if (undoBtn) {
-  undoBtn.addEventListener('click', () => {
-    if (isConnected) {
-      console.log('Undo button clicked');
-      wsClient.emitUndoRequest();
-    }
-  });
+function handleRedo() {
+  if (isConnected) {
+    console.log('Redo button clicked');
+    wsClient.emitRedoRequest();
+  }
 }
 
-if (redoBtn) {
-  redoBtn.addEventListener('click', () => {
-    if (isConnected) {
-      console.log('Redo button clicked');
-      wsClient.emitRedoRequest();
-    }
-  });
+function handleClear() {
+  if (isConnected) {
+    console.log('Clear button clicked');
+    wsClient.emitClearCanvas();
+  } else {
+    console.log('Clear button clicked - clearing locally (not connected)');
+    stateManager.clearState();
+    canvas.clearCanvas();
+  }
 }
 
-if (clearBtn) {
-  clearBtn.addEventListener('click', () => {
-    if (isConnected) {
-      console.log('Clear button clicked');
-      wsClient.emitClearCanvas();
-    } else {
-      console.log('Clear button clicked - clearing locally (not connected)');
-      stateManager.clearState();
-      canvas.clearCanvas();
-    }
-  });
-}
+if (undoBtn) undoBtn.addEventListener('click', handleUndo);
+if (redoBtn) redoBtn.addEventListener('click', handleRedo);
+if (clearBtn) clearBtn.addEventListener('click', handleClear);
+
+if (undoBtnDt) undoBtnDt.addEventListener('click', handleUndo);
+if (redoBtnDt) redoBtnDt.addEventListener('click', handleRedo);
+if (clearBtnDt) clearBtnDt.addEventListener('click', handleClear);
 
 // Drawing tool controls
 const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
@@ -242,11 +248,27 @@ const brushSizeValue = document.getElementById('brush-size-value') as HTMLSpanEl
 const toolBrush = document.getElementById('tool-brush') as HTMLInputElement;
 const toolEraser = document.getElementById('tool-eraser') as HTMLInputElement;
 
+const colorPickerDesktop = document.getElementById('color-picker-desktop') as HTMLInputElement;
+const brushSizeSliderDesktop = document.getElementById('brush-size-desktop') as HTMLInputElement;
+const brushSizeValueDesktop = document.getElementById(
+  'brush-size-value-desktop',
+) as HTMLSpanElement;
+
 if (colorPicker) {
   colorPicker.addEventListener('input', (event) => {
     const color = (event.target as HTMLInputElement).value;
     canvas.setColor(color);
+    if (colorPickerDesktop) colorPickerDesktop.value = color;
     console.log('Color changed to:', color);
+  });
+}
+
+if (colorPickerDesktop) {
+  colorPickerDesktop.addEventListener('input', (event) => {
+    const color = (event.target as HTMLInputElement).value;
+    canvas.setColor(color);
+    if (colorPicker) colorPicker.value = color;
+    console.log('Color changed to (desktop):', color);
   });
 }
 
@@ -255,7 +277,20 @@ if (brushSizeSlider && brushSizeValue) {
     const size = parseInt((event.target as HTMLInputElement).value, 10);
     canvas.setBrushSize(size);
     brushSizeValue.textContent = size.toString();
+    if (brushSizeSliderDesktop) brushSizeSliderDesktop.value = size.toString();
+    if (brushSizeValueDesktop) brushSizeValueDesktop.textContent = size.toString();
     console.log('Brush size changed to:', size);
+  });
+}
+
+if (brushSizeSliderDesktop && brushSizeValueDesktop) {
+  brushSizeSliderDesktop.addEventListener('input', (event) => {
+    const size = parseInt((event.target as HTMLInputElement).value, 10);
+    canvas.setBrushSize(size);
+    brushSizeValueDesktop.textContent = size.toString();
+    if (brushSizeSlider) brushSizeSlider.value = size.toString();
+    if (brushSizeValue) brushSizeValue.textContent = size.toString();
+    console.log('Brush size changed to (desktop):', size);
   });
 }
 
