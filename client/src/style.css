@@ -49,6 +49,60 @@ body {
 }
 
 .connection-status {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  z-index: 1000;
+}
+
+.performance-metrics {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  backdrop-filter: blur(10px);
+}
+
+.metrics-row {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.metric-item i {
+  color: #4caf50;
+  font-size: 12px;
+}
+
+.metric-item span {
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.connection-status {
   position: absolute;
   top: 20px;
   left: 20px;

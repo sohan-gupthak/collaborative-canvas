@@ -129,17 +129,4 @@ export class PerformanceMonitor {
     this.totalEvents = 0;
     this.lastFrameTime = performance.now();
   }
-
-  public logMetrics(): void {
-    const metrics = this.getMetrics();
-    console.log('=== Performance Metrics ===');
-    console.log(`FPS: ${metrics.fps}`);
-    console.log(`Average Frame Time: ${metrics.averageFrameTime}ms`);
-    console.log(`Event Processing Time: ${metrics.eventProcessingTime}ms`);
-    console.log(`Memory Usage: ${metrics.memoryUsageMB}MB`);
-    console.log(`Network Latency: ${metrics.networkLatency}ms`);
-    console.log(`Total Events: ${metrics.totalEvents}`);
-    console.log(`Dropped Frames: ${metrics.droppedFrames}`);
-    console.log('===========================');
-  }
 }

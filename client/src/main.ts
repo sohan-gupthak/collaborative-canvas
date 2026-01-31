@@ -147,21 +147,28 @@ setInterval(() => {
   }
 }, 5000);
 
+function updatePerformanceUI(fps: number, latency: number, memoryMB: number, eventCount: number) {
+  const fpsElement = document.getElementById('metric-fps');
+  const latencyElement = document.getElementById('metric-latency');
+  const memoryElement = document.getElementById('metric-memory');
+  const eventsElement = document.getElementById('metric-events');
+
+  if (fpsElement) fpsElement.textContent = fps.toFixed(0);
+  if (latencyElement) latencyElement.textContent = latency.toFixed(0);
+  if (memoryElement) memoryElement.textContent = memoryMB.toFixed(1);
+  if (eventsElement) eventsElement.textContent = eventCount.toString();
+}
+
 perfMonitor.onMetricsUpdate((metrics) => {
   const memoryStats = stateManager.getMemoryStats();
   const health = wsClient.getConnectionHealth();
 
-  console.log('=== Performance Report ===');
-  console.log(
-    `FPS: ${metrics.fps} | Frame Time: ${metrics.averageFrameTime}ms | Dropped: ${metrics.droppedFrames}`,
+  updatePerformanceUI(
+    metrics.fps,
+    health.latency,
+    memoryStats.estimatedSizeMB,
+    memoryStats.drawingEventsCount,
   );
-  console.log(`Events: ${metrics.totalEvents} | Processing: ${metrics.eventProcessingTime}ms`);
-  console.log(`Memory: ${memoryStats.estimatedSizeMB}MB (${memoryStats.totalPoints} points)`);
-  console.log(`Network: ${health.latency}ms latency (${health.quality})`);
-  console.log(
-    `State: ${memoryStats.drawingEventsCount} events | Undo: ${memoryStats.undoStackSize} | Redo: ${memoryStats.redoStackSize}`,
-  );
-  console.log('=========================');
 });
 
 function animationLoop() {
