@@ -13,6 +13,7 @@ export class DrawingRenderer {
   private dirtyRects: DirtyRect[] = [];
   private pendingRenderFrame: number | null = null;
   private allEvents: DrawingEvent[] = [];
+  private strokeLastPoints: Map<string, Point> = new Map();
 
   constructor(context: CanvasRenderingContext2D) {
     this.ctx = context;
@@ -25,8 +26,22 @@ export class DrawingRenderer {
 
     this.allEvents.push(event);
 
+    const strokeId = event.strokeId || event.id;
+    const lastPoint = this.strokeLastPoints.get(strokeId);
+
+    let renderPoints = [...event.points];
+    if (event.type === 'line' && lastPoint && event.points.length > 0) {
+      renderPoints = [lastPoint, ...event.points];
+    }
+
+    if (event.type === 'end') {
+      this.strokeLastPoints.delete(strokeId);
+    } else if (event.points.length > 0) {
+      this.strokeLastPoints.set(strokeId, event.points[event.points.length - 1]);
+    }
+
     // Calculate bounding box for this event
-    const bounds = this.calculateBounds(event.points, event.style);
+    const bounds = this.calculateBounds(renderPoints, event.style);
     this.markDirty(bounds);
 
     this.ctx.save();
@@ -36,12 +51,12 @@ export class DrawingRenderer {
 
       this.ctx.beginPath();
 
-      if (event.points.length === 1) {
+      if (renderPoints.length === 1) {
         // Single point - draw a small circle
-        this.renderSinglePoint(event.points[0], event.style);
+        this.renderSinglePoint(renderPoints[0], event.style);
       } else {
         // Multiple points - draw connected line segments
-        this.renderMultiplePoints(event.points);
+        this.renderMultiplePoints(renderPoints);
       }
     } finally {
       // we are restoring the context state every single time
@@ -239,6 +254,7 @@ export class DrawingRenderer {
   public clearAllEvents(): void {
     this.allEvents = [];
     this.dirtyRects = [];
+    this.strokeLastPoints.clear();
     if (this.pendingRenderFrame !== null) {
       cancelAnimationFrame(this.pendingRenderFrame);
       this.pendingRenderFrame = null;
