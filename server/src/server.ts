@@ -91,46 +91,41 @@ function validateDrawingEventData(data: any): ValidationResult {
 }
 
 const app = express();
+
+app.set('trust proxy', 1);
+
 const server = createServer(app);
 
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(',').map((url) => url.trim())
   : ['http://localhost:3000'];
 
+console.log('[Server] Allowed origins:', allowedOrigins);
+console.log('[Server] Environment:', process.env.NODE_ENV);
+console.log('[Server] Port:', process.env.PORT || 3001);
+
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.log('[Server] Origin rejected:', origin);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
   allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 const roomManager = new RoomManager(io);
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
+    origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   }),
 );
+
 app.use(express.json());
 
 // using Map to store the connected clients
@@ -650,6 +645,7 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`[${new Date().toISOString()}] Collaborative Drawing Server running on port ${PORT}`);
   console.log(`[${new Date().toISOString()}] Socket.io server ready for connections`);
+  console.log(`[${new Date().toISOString()}] Allowed origins:`, allowedOrigins);
 });
 
 export { app, server, io, connectedClients, roomManager };
