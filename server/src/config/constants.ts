@@ -1,0 +1,54 @@
+export const PERFORMANCE = {
+  BATCH_INTERVAL_MS: 16, // ~60 FPS
+
+  MAX_BATCH_SIZE: 20, // Max 20 events per batch
+
+  PING_INTERVAL_MS: 10000, // 10 seconds
+
+  PING_TIMEOUT_MS: 20000, // 20 seconds
+} as const;
+
+export const STATE_LIMITS = {
+  MAX_HISTORY_SIZE: 10000, // 10,000 events
+
+  COMPRESSION_THRESHOLD: 1000, // Compress after 1,000 events
+
+  MAX_UNDO_RATIO: 0.1, // 10% of MAX_HISTORY_SIZE
+} as const;
+
+export const VALIDATION = {
+  VALID_EVENT_TYPES: ['line', 'start', 'end'] as const,
+
+  VALID_LINE_CAPS: ['round', 'square', 'butt'] as const,
+
+  VALID_LINE_JOINS: ['round', 'bevel', 'miter'] as const,
+
+  MIN_LINE_WIDTH: 0,
+
+  MAX_LINE_WIDTH: 100,
+
+  MAX_ROOM_ID_LENGTH: 100,
+
+  MIN_ROOM_ID_LENGTH: 1,
+
+  MAX_POINTS_PER_EVENT: 1000, // Max 1000 points per drawing event
+} as const;
+
+// Error codes for client communications
+export const ERROR_CODES = {
+  INVALID_ROOM_ID: 'INVALID_ROOM_ID',
+  ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
+  NOT_IN_ROOM: 'NOT_IN_ROOM',
+  INVALID_DRAWING_EVENT: 'INVALID_DRAWING_EVENT',
+  INVALID_ROOM_STATE: 'INVALID_ROOM_STATE',
+  JOIN_ROOM_ERROR: 'JOIN_ROOM_ERROR',
+  LEAVE_ROOM_ERROR: 'LEAVE_ROOM_ERROR',
+  DRAWING_EVENT_ERROR: 'DRAWING_EVENT_ERROR',
+  CURSOR_EVENT_ERROR: 'CURSOR_EVENT_ERROR',
+  UNDO_REQUEST_ERROR: 'UNDO_REQUEST_ERROR',
+  REDO_REQUEST_ERROR: 'REDO_REQUEST_ERROR',
+  CLEAR_CANVAS_ERROR: 'CLEAR_CANVAS_ERROR',
+  STATE_SYNC_ERROR: 'STATE_SYNC_ERROR',
+  ROOM_LIST_ERROR: 'ROOM_LIST_ERROR',
+  ROOM_INFO_ERROR: 'ROOM_INFO_ERROR',
+} as const;

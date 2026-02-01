@@ -1,19 +1,11 @@
-import { DrawingEvent } from './room-manager.js';
-
-export interface CanvasState {
-  drawingEvents: DrawingEvent[];
-  undoStack: DrawingEvent[];
-  redoStack: DrawingEvent[];
-  version: number;
-}
-
-export interface CompressedState {
-  events: DrawingEvent[];
-  version: number;
-  compressedAt: number;
-  originalSize: number;
-  compressedSize: number;
-}
+import type {
+  DrawingEvent,
+  CanvasState,
+  CompressedState,
+  StateStats,
+  StateValidationResult,
+} from './types/index.js';
+import { STATE_LIMITS } from './config/constants.js';
 
 export class StateManager {
   private drawingHistory: DrawingEvent[] = [];
@@ -24,7 +16,11 @@ export class StateManager {
   private readonly maxHistorySize: number;
   private readonly compressionThreshold: number;
 
-  constructor(roomId: string, maxHistorySize: number = 10000, compressionThreshold: number = 1000) {
+  constructor(
+    roomId: string,
+    maxHistorySize: number = STATE_LIMITS.MAX_HISTORY_SIZE,
+    compressionThreshold: number = STATE_LIMITS.COMPRESSION_THRESHOLD,
+  ) {
     this.roomId = roomId;
     this.maxHistorySize = maxHistorySize;
     this.compressionThreshold = compressionThreshold;
@@ -137,17 +133,17 @@ export class StateManager {
     return eventsToRedo;
   }
 
-  getCompleteState(): CanvasState {
-    return {
-      drawingEvents: [...this.drawingHistory], // Create a copy to prevent external modification
-      undoStack: [...this.undoStack],
-      redoStack: [...this.redoStack],
+  getCompleteState(): Readonly<CanvasState> {
+    return Object.freeze({
+      drawingEvents: Object.freeze([...this.drawingHistory]),
+      undoStack: Object.freeze([...this.undoStack]),
+      redoStack: Object.freeze([...this.redoStack]),
       version: this.version,
-    };
+    });
   }
 
-  reconstructCanvas(): DrawingEvent[] {
-    return [...this.drawingHistory];
+  reconstructCanvas(): readonly DrawingEvent[] {
+    return Object.freeze([...this.drawingHistory]);
   }
 
   compressHistory(): CompressedState {
@@ -163,7 +159,7 @@ export class StateManager {
     }
 
     // Compress undo stack if it's too large
-    const maxUndoSize = Math.floor(this.maxHistorySize * 0.1); // Keeping 10% of max history as undo
+    const maxUndoSize = Math.floor(this.maxHistorySize * STATE_LIMITS.MAX_UNDO_RATIO); // Keeping 10% of max history as undo
     if (this.undoStack.length > maxUndoSize) {
       const undoToRemove = this.undoStack.length - maxUndoSize;
       this.undoStack.splice(0, undoToRemove);
@@ -197,7 +193,7 @@ export class StateManager {
     return Buffer.byteLength(stateJson, 'utf8');
   }
 
-  validateState(): { isValid: boolean; errors: string[] } {
+  validateState(): StateValidationResult {
     const errors: string[] = [];
 
     for (let i = 1; i < this.drawingHistory.length; i++) {
@@ -243,7 +239,7 @@ export class StateManager {
     return { isValid, errors };
   }
 
-  getStateStats() {
+  getStateStats(): StateStats {
     return {
       roomId: this.roomId,
       historySize: this.drawingHistory.length,

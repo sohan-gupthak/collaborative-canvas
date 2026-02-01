@@ -69,9 +69,29 @@ A high-performance real-time collaborative drawing application built with TypeSc
 │   └── package.json
 ├── server/                    # Backend server (Node.js + Socket.io)
 │   ├── src/
-│   │   ├── server.ts         # Express + Socket.io server
-│   │   ├── room-manager.ts   # Room and client management
-│   │   └── state-manager.ts  # Server-side state management
+│   │   ├── types/            # TypeScript type definitions
+│   │   │   ├── domain.ts     # Core domain models (DrawingEvent, CanvasState, etc.)
+│   │   │   ├── events.ts     # Client→Server event payloads
+│   │   │   ├── responses.ts  # Server→Client response types
+│   │   │   ├── validation.ts # Validation result types
+│   │   │   └── index.ts      # Central type exports
+│   │   ├── config/
+│   │   │   └── constants.ts  # Performance, state limits, error codes
+│   │   ├── validation/       # Input validation modules
+│   │   │   ├── drawing-event-validator.ts  # Drawing event validation
+│   │   │   ├── room-validator.ts           # Room ID validation
+│   │   │   └── index.ts      # Validation exports
+│   │   ├── handlers/         # Socket event handlers
+│   │   │   ├── room-handlers.ts        # Room management events
+│   │   │   ├── drawing-handlers.ts     # Drawing and cursor events
+│   │   │   ├── state-handlers.ts       # Undo/redo/clear/sync events
+│   │   │   ├── connection-handlers.ts  # Connection lifecycle events
+│   │   │   └── index.ts      # Handler exports
+│   │   ├── connection-manager.ts  # Client connection tracking
+│   │   ├── event-batcher.ts       # Performance optimization (event batching)
+│   │   ├── room-manager.ts        # Room and client management
+│   │   ├── state-manager.ts       # Server-side state management
+│   │   └── server.ts              # Express + Socket.io server
 │   └── package.json
 ├── PERFORMANCE_OPTIMIZATIONS.md  # Performance implementation details
 ├── package.json               # Root workspace configuration
@@ -219,8 +239,15 @@ Real-time metrics displayed at the top center:
 
 ### Server-Side
 
+- **Modular Architecture**: Organized into types, config, validation, and handlers modules
+- **Type System**: Comprehensive TypeScript types with readonly properties and defensive copying
+- **Connection Manager**: Centralized client tracking with session statistics
 - **Room Manager**: Handles multiple drawing sessions with isolated state
-- **Event Batching**: Queues and flushes events every 16ms for optimization
+- **State Manager**: Independent state management with undo/redo and history compression
+- **Event Batcher**: Performance optimization queuing and flushing events every 16ms
+- **Validation Layer**: Input validation for drawing events and room operations
+- **Handler Modules**: Focused, testable functions for all socket events
+- **Constants Management**: Centralized configuration for performance tuning and error codes
 - **State Synchronization**: Broadcasts canvas state to new room members
 - **Connection Health**: Ping/pong mechanism for latency tracking
 

@@ -1,48 +1,29 @@
 import { Server } from 'socket.io';
-import { StateManager, CanvasState } from './state-manager.js';
-
-export interface CursorEvent {
-  userId: string;
-  roomId: string;
-  position: { x: number; y: number; timestamp: number };
-  isActive: boolean;
-  timestamp: number;
-}
-
-export interface DrawingEvent {
-  id: string;
-  strokeId: string;
-  type: 'line' | 'start' | 'end';
-  userId: string;
-  roomId: string;
-  points: Array<{ x: number; y: number; timestamp: number }>;
-  style: {
-    color: string;
-    lineWidth: number;
-    lineCap: 'round' | 'square' | 'butt';
-    lineJoin: 'round' | 'bevel' | 'miter';
-  };
-  timestamp: number;
-}
+import { StateManager } from './state-manager.js';
+import { EventBatcher } from './event-batcher.js';
+import type {
+  DrawingEvent,
+  CursorEvent,
+  CanvasState,
+  RoomInfo,
+  StateStats,
+  StateValidationResult,
+} from './types/index.js';
 
 export class Room {
   public readonly id: string;
-  public readonly clients: Set<string>;
-  public readonly cursors: Map<string, CursorEvent>;
-  public readonly stateManager: StateManager;
+  private readonly clients: Set<string>;
+  private readonly cursors: Map<string, CursorEvent>;
+  private readonly stateManager: StateManager;
+  private readonly eventBatcher: EventBatcher;
   private readonly createdAt: Date;
-
-  // Performance optimization - event batching
-  private eventBatchQueue: Array<{ event: string; data: any; excludeSocket?: string }> = [];
-  private batchTimer: NodeJS.Timeout | null = null;
-  private readonly BATCH_INTERVAL = 16; // ~60 FPS (16ms)
-  private readonly MAX_BATCH_SIZE = 20;
 
   constructor(id: string) {
     this.id = id;
     this.clients = new Set();
     this.cursors = new Map();
     this.stateManager = new StateManager(id);
+    this.eventBatcher = new EventBatcher();
     this.createdAt = new Date();
   }
 
@@ -77,21 +58,37 @@ export class Room {
     this.cursors.delete(socketId);
   }
 
-  getInfo() {
+  getInfo(): RoomInfo {
     return {
       id: this.id,
       clientCount: this.clients.size,
       cursorCount: this.cursors.size,
-      createdAt: this.createdAt,
+      createdAt: new Date(this.createdAt.getTime()),
       stateStats: this.stateManager.getStateStats(),
     };
+  }
+
+  validateState(): StateValidationResult {
+    return this.stateManager.validateState();
+  }
+
+  getStateStats(): StateStats {
+    return this.stateManager.getStateStats();
+  }
+
+  getCursors(): ReadonlyMap<string, CursorEvent> {
+    return this.cursors;
+  }
+
+  getClients(): ReadonlySet<string> {
+    return this.clients;
   }
 
   addDrawingEvent(event: DrawingEvent): void {
     this.stateManager.addDrawingEvent(event);
   }
 
-  getCanvasState(): CanvasState {
+  getCanvasState(): Readonly<CanvasState> {
     return this.stateManager.getCompleteState();
   }
 
@@ -103,7 +100,7 @@ export class Room {
     return this.stateManager.redo();
   }
 
-  getDrawingHistory(): DrawingEvent[] {
+  getDrawingHistory(): readonly DrawingEvent[] {
     return this.stateManager.reconstructCanvas();
   }
 
@@ -113,31 +110,19 @@ export class Room {
   }
 
   queueBroadcast(event: string, data: any, excludeSocket?: string): void {
-    this.eventBatchQueue.push({ event, data, excludeSocket });
-
-    if (this.eventBatchQueue.length >= this.MAX_BATCH_SIZE) {
-      this.flushBatch();
-    } else if (!this.batchTimer) {
-      // Schedule batch flush
-      this.batchTimer = setTimeout(() => {
-        this.flushBatch();
-      }, this.BATCH_INTERVAL);
-    }
+    this.eventBatcher.enqueue(event, data, excludeSocket);
   }
 
   flushBatch(): void {
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-      this.batchTimer = null;
-    }
-
-    if (this.eventBatchQueue.length === 0) return;
-
-    this.eventBatchQueue.splice(0);
+    this.eventBatcher.flush();
   }
 
-  getBatchedEvents(): Array<{ event: string; data: any; excludeSocket?: string }> {
-    return this.eventBatchQueue.splice(0);
+  getBatchedEvents() {
+    return this.eventBatcher.flush();
+  }
+
+  hasPendingEvents(): boolean {
+    return this.eventBatcher.hasPendingEvents();
   }
 }
 
