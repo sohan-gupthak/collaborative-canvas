@@ -1,6 +1,22 @@
-import { Point, DrawingStyle, DrawingEvent, createDrawingEvent } from './drawing-events.js';
+import type {
+  Point,
+  DrawingStyle,
+  DrawingEvent,
+  DrawingEventType,
+  CursorEvent,
+  ConnectionQuality,
+} from './types/index.js';
+import { createDrawingEvent } from './drawing-events.js';
 import { DrawingRenderer } from './drawing-renderer.js';
-import { CursorEvent } from './websocket-client.js';
+import {
+  CURSOR_INACTIVE_DELAY,
+  BATCH_INTERVAL,
+  MAX_BATCH_SIZE,
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_LINE_WIDTH,
+  DEFAULT_LINE_CAP,
+  DEFAULT_LINE_JOIN,
+} from './config/constants.js';
 
 export class Canvas {
   private canvas: HTMLCanvasElement;
@@ -14,14 +30,14 @@ export class Canvas {
   private currentPath: Point[] = [];
   private currentStrokeStyle: DrawingStyle | null = null;
   private defaultStyle: DrawingStyle = {
-    color: '#000000',
-    lineWidth: 2,
-    lineCap: 'round',
-    lineJoin: 'round',
+    color: DEFAULT_STROKE_COLOR,
+    lineWidth: DEFAULT_LINE_WIDTH,
+    lineCap: DEFAULT_LINE_CAP,
+    lineJoin: DEFAULT_LINE_JOIN,
     isEraser: false,
   };
-  private currentColor: string = '#000000';
-  private currentLineWidth: number = 2;
+  private currentColor: string = DEFAULT_STROKE_COLOR;
+  private currentLineWidth: number = DEFAULT_LINE_WIDTH;
   private isEraserMode: boolean = false;
   private onDrawingEventCallback?: (event: DrawingEvent) => void;
   private onCursorEventCallback?: (cursor: CursorEvent) => void;
@@ -30,18 +46,16 @@ export class Canvas {
   private currentStrokeId: string | null = null;
   private lastCursorPosition: Point | null = null;
   private cursorActivityTimer: NodeJS.Timeout | null = null;
-  private readonly CURSOR_INACTIVE_DELAY = 2000; // currently set to 2s
   private ghostCursors: Map<string, CursorEvent> = new Map();
   private userColors: Map<string, string> = new Map();
 
   private eventBatchQueue: DrawingEvent[] = [];
   private batchTimer: NodeJS.Timeout | null = null;
-  private batchInterval = 16; // ~60 FPS (16ms) - adaptive
-  private readonly MAX_BATCH_SIZE = 10;
+  private batchInterval = BATCH_INTERVAL; // Adaptive
   private lastEmitTime = 0;
-  private minEmitInterval = 16; // Throttle to 60 events/second - adaptive
+  private minEmitInterval = BATCH_INTERVAL; // Throttle to 60 events/second - adaptive
 
-  private connectionQuality: 'excellent' | 'good' | 'fair' | 'poor' = 'good';
+  private connectionQuality: ConnectionQuality = 'good';
 
   constructor(canvasElement: HTMLCanvasElement) {
     this.canvas = canvasElement;
@@ -252,8 +266,8 @@ export class Canvas {
     this.defaultStyle = {
       color: this.isEraserMode ? '#ffffff' : this.currentColor,
       lineWidth: this.currentLineWidth,
-      lineCap: 'round',
-      lineJoin: 'round',
+      lineCap: DEFAULT_LINE_CAP,
+      lineJoin: DEFAULT_LINE_JOIN,
       isEraser: this.isEraserMode,
     };
   }
@@ -346,7 +360,7 @@ export class Canvas {
     this.ctx.restore();
   }
 
-  private emitDrawingEvent(type: 'line' | 'start' | 'end', points: Point[]): void {
+  private emitDrawingEvent(type: DrawingEventType, points: Point[]): void {
     if (!this.onDrawingEventCallback) return;
 
     const styleToUse = this.currentStrokeStyle || this.defaultStyle;
@@ -376,7 +390,7 @@ export class Canvas {
 
       if (timeSinceLastEmit >= this.minEmitInterval) {
         this.flushEventBatch();
-      } else if (this.eventBatchQueue.length >= this.MAX_BATCH_SIZE) {
+      } else if (this.eventBatchQueue.length >= MAX_BATCH_SIZE) {
         this.flushEventBatch();
       } else if (!this.batchTimer) {
         this.batchTimer = setTimeout(() => {
@@ -451,7 +465,7 @@ export class Canvas {
       if (this.lastCursorPosition) {
         this.emitCursorEvent(this.lastCursorPosition, false);
       }
-    }, this.CURSOR_INACTIVE_DELAY);
+    }, CURSOR_INACTIVE_DELAY);
   }
 
   // Mouse event handlers
@@ -506,7 +520,7 @@ export class Canvas {
     this.endDrawing();
   }
 
-  public updateConnectionQuality(quality: 'excellent' | 'good' | 'fair' | 'poor'): void {
+  public updateConnectionQuality(quality: ConnectionQuality): void {
     if (this.connectionQuality === quality) return; // No change
 
     this.connectionQuality = quality;

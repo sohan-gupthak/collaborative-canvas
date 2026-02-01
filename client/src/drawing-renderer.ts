@@ -1,5 +1,4 @@
-import { DrawingEvent, DrawingStyle, Point } from './drawing-events.js';
-import { CursorEvent } from './websocket-client.js';
+import type { DrawingEvent, DrawingStyle, Point, CursorEvent } from './types/index.js';
 
 interface DirtyRect {
   x: number;

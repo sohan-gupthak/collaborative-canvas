@@ -40,12 +40,30 @@ A high-performance real-time collaborative drawing application built with TypeSc
 ```
 ├── client/                    # Frontend application (Vite + TypeScript)
 │   ├── src/
+│   │   ├── ui/               # UI controllers (Phase 3 refactoring)
+│   │   │   ├── UICoordinator.ts      # Main UI coordinator
+│   │   │   ├── ToolbarController.ts  # Drawing tools controls
+│   │   │   ├── RoomController.ts     # Room management UI
+│   │   │   ├── StatusController.ts   # Status and metrics display
+│   │   │   └── KeyboardController.ts # Keyboard shortcuts
+│   │   ├── types/            # TypeScript type definitions
+│   │   │   ├── index.ts      # Central type exports
+│   │   │   ├── events.ts     # Drawing and cursor event types
+│   │   │   ├── state.ts      # Canvas state types
+│   │   │   ├── network.ts    # WebSocket payload types
+│   │   │   ├── callbacks.ts  # Callback function signatures
+│   │   │   ├── performance.ts # Performance metric types
+│   │   │   └── errors.ts     # Error type hierarchy
+│   │   ├── config/
+│   │   │   └── constants.ts  # Application constants and config
 │   │   ├── canvas.ts         # Canvas rendering and interaction
 │   │   ├── drawing-renderer.ts   # Optimized rendering engine
+│   │   ├── drawing-events.ts     # Event validation and utilities
 │   │   ├── websocket-client.ts   # WebSocket communication
 │   │   ├── client-state-manager.ts   # State management
 │   │   ├── performance-monitor.ts    # Performance tracking
-│   │   ├── main.ts           # Application entry point
+│   │   └── main.ts           # Application entry point
+│   ├── styles/
 │   │   └── style.css         # Application styles
 │   ├── index.html
 │   └── package.json
@@ -191,6 +209,9 @@ Real-time metrics displayed at the top center:
 
 ### Client-Side
 
+- **Modular Architecture**: Separated UI controllers for toolbar, rooms, status, and keyboard shortcuts
+- **Type Safety**: Comprehensive TypeScript type system with discriminated unions
+- **Configuration Management**: Centralized constants for all tunable parameters
 - **Canvas Management**: Dual canvas system (drawing + cursor overlay)
 - **State Management**: Client-side state with automatic synchronization
 - **Event Throttling**: Adaptive 60 FPS throttling based on connection quality

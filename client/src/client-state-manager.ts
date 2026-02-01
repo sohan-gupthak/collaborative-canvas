@@ -1,46 +1,33 @@
-import { DrawingEvent, validateDrawingEvent } from './drawing-events.js';
+import { validateDrawingEvent } from './drawing-events.js';
+import type {
+  DrawingEvent,
+  CanvasState,
+  MutableCanvasState,
+  MemoryStats,
+  StateStats,
+  StateValidationResult,
+  StateSyncData,
+  StateValidationFailedCallback,
+} from './types/index.js';
+import {
+  MAX_MEMORY_MB,
+  MAX_DRAWING_EVENTS,
+  MAX_UNDO_STACK_SIZE,
+  MAX_REDO_STACK_SIZE,
+} from './config/constants.js';
 
-export interface CanvasState {
-  drawingEvents: DrawingEvent[];
-  undoStack: DrawingEvent[];
-  redoStack: DrawingEvent[];
-  version: number;
-}
-
-export interface MemoryStats {
-  estimatedSizeBytes: number;
-  estimatedSizeMB: number;
-  drawingEventsCount: number;
-  undoStackSize: number;
-  redoStackSize: number;
-  totalPoints: number;
-}
-
-export interface StateSyncData {
-  roomId: string;
-  canvasState: CanvasState;
-  drawingHistory: DrawingEvent[];
-  version: number;
-  clientVersion?: number;
-  isComplete: boolean;
-  timestamp: string;
-}
-
-export interface StateValidationResult {
-  isValid: boolean;
-  errors: string[];
-}
+export type {
+  CanvasState,
+  MemoryStats,
+  StateSyncData,
+  StateValidationResult,
+} from './types/index.js';
 
 export class ClientStateManager {
-  private currentState: CanvasState;
+  private currentState: MutableCanvasState;
   private roomId: string | null = null;
-  private onStateReconstructedCallback?: (events: DrawingEvent[]) => void;
-  private onStateValidationFailedCallback?: (errors: string[]) => void;
-
-  private readonly MAX_MEMORY_MB = 50; // Maximum memory before garbage collection
-  private readonly MAX_DRAWING_EVENTS = 5000; // Maximum number of drawing events
-  private readonly MAX_UNDO_STACK_SIZE = 100; // Maximum undo history
-  private readonly MAX_REDO_STACK_SIZE = 100; // Maximum redo history
+  private onStateReconstructedCallback?: (events: readonly DrawingEvent[]) => void;
+  private onStateValidationFailedCallback?: StateValidationFailedCallback;
 
   constructor() {
     this.currentState = {
@@ -174,11 +161,16 @@ export class ClientStateManager {
     return { isValid: errors.length === 0, errors };
   }
 
-  private ensureChronologicalOrder(events: DrawingEvent[]): void {
-    events.sort((a, b) => a.timestamp - b.timestamp);
+  private ensureChronologicalOrder(events: readonly DrawingEvent[] | DrawingEvent[]): void {
+    if (Array.isArray(events) && !Object.isFrozen(events)) {
+      (events as DrawingEvent[]).sort((a, b) => a.timestamp - b.timestamp);
+    }
   }
 
-  public requestStateSync(websocketClient: any): void {
+  public requestStateSync(websocketClient: {
+    isConnected(): boolean;
+    socket?: { emit(event: string, data: unknown): void };
+  }): void {
     if (!websocketClient || !websocketClient.isConnected()) {
       console.warn('[ClientStateManager] Cannot request state sync: not connected');
       return;
@@ -280,7 +272,7 @@ export class ClientStateManager {
       undoStack: [...this.currentState.undoStack],
       redoStack: [...this.currentState.redoStack],
       version: this.currentState.version,
-    };
+    } as CanvasState;
   }
 
   public getCurrentVersion(): number {
@@ -303,16 +295,16 @@ export class ClientStateManager {
   }
 
   // Set callback for state reconstruction
-  public onStateReconstructed(callback: (events: DrawingEvent[]) => void): void {
+  public onStateReconstructed(callback: (events: readonly DrawingEvent[]) => void): void {
     this.onStateReconstructedCallback = callback;
   }
 
   // Set callback for state validation failures
-  public onStateValidationFailed(callback: (errors: string[]) => void): void {
+  public onStateValidationFailed(callback: StateValidationFailedCallback): void {
     this.onStateValidationFailedCallback = callback;
   }
 
-  public getStateStats() {
+  public getStateStats(): StateStats {
     return {
       roomId: this.roomId,
       version: this.currentState.version,
@@ -334,16 +326,16 @@ export class ClientStateManager {
     const memoryStats = this.getMemoryStats();
     let cleanupPerformed = false;
 
-    if (memoryStats.estimatedSizeMB > this.MAX_MEMORY_MB) {
+    if (memoryStats.estimatedSizeMB > MAX_MEMORY_MB) {
       console.warn(
-        `[ClientStateManager] Memory threshold exceeded: ${memoryStats.estimatedSizeMB}MB > ${this.MAX_MEMORY_MB}MB`,
+        `[ClientStateManager] Memory threshold exceeded: ${memoryStats.estimatedSizeMB}MB > ${MAX_MEMORY_MB}MB`,
       );
       cleanupPerformed = true;
     }
 
-    if (this.currentState.drawingEvents.length > this.MAX_DRAWING_EVENTS) {
+    if (this.currentState.drawingEvents.length > MAX_DRAWING_EVENTS) {
       console.warn(
-        `[ClientStateManager] Drawing events limit exceeded: ${this.currentState.drawingEvents.length} > ${this.MAX_DRAWING_EVENTS}`,
+        `[ClientStateManager] Drawing events limit exceeded: ${this.currentState.drawingEvents.length} > ${MAX_DRAWING_EVENTS}`,
       );
       cleanupPerformed = true;
     }
@@ -358,16 +350,16 @@ export class ClientStateManager {
       );
     }
 
-    if (this.currentState.undoStack.length > this.MAX_UNDO_STACK_SIZE) {
-      const excess = this.currentState.undoStack.length - this.MAX_UNDO_STACK_SIZE;
+    if (this.currentState.undoStack.length > MAX_UNDO_STACK_SIZE) {
+      const excess = this.currentState.undoStack.length - MAX_UNDO_STACK_SIZE;
       this.currentState.undoStack.splice(0, excess);
       console.log(
         `[ClientStateManager] Garbage collection: trimmed ${excess} events from undo stack`,
       );
     }
 
-    if (this.currentState.redoStack.length > this.MAX_REDO_STACK_SIZE) {
-      const excess = this.currentState.redoStack.length - this.MAX_REDO_STACK_SIZE;
+    if (this.currentState.redoStack.length > MAX_REDO_STACK_SIZE) {
+      const excess = this.currentState.redoStack.length - MAX_REDO_STACK_SIZE;
       this.currentState.redoStack.splice(0, excess);
       console.log(
         `[ClientStateManager] Garbage collection: trimmed ${excess} events from redo stack`,

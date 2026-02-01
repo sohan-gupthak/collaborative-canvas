@@ -1,34 +1,46 @@
 import { io, Socket } from 'socket.io-client';
-import { DrawingEvent, validateDrawingEvent } from './drawing-events.js';
+import { validateDrawingEvent } from './drawing-events.js';
+import type {
+  DrawingEvent,
+  CursorEvent,
+  ConnectionState,
+  ConnectionHealth,
+  ConnectionStateCallback,
+  DrawingEventCallback,
+  CursorEventCallback,
+  StateSyncCallback,
+  UserLeftCallback,
+  UserJoinedCallback,
+  UndoAppliedCallback,
+  RedoAppliedCallback,
+  StateSyncFailedCallback,
+  CanvasClearedCallback,
+  RoomListCallback,
+  RoomInfoCallback,
+  JoinRoomPayload,
+  UndoRequestPayload,
+  RedoRequestPayload,
+  ClearCanvasPayload,
+  StateSyncRequestPayload,
+  RoomInfoRequestPayload,
+  PingPayload,
+  PongPayload,
+  SocketErrorResponse,
+} from './types/index.js';
+import {
+  CONNECTION_CLEANUP_DELAY,
+  SOCKET_TIMEOUT,
+  MAX_RECONNECT_ATTEMPTS,
+  HEALTH_CHECK_INTERVAL,
+} from './config/constants.js';
 
-export interface CursorEvent {
-  userId: string;
-  roomId: string;
-  position: { x: number; y: number; timestamp: number };
-  isActive: boolean;
-  timestamp: number;
-}
-
-export interface ConnectionState {
-  isConnected: boolean;
-  roomId: string | null;
-  userId: string;
-  reconnectAttempts: number;
-  lastError: string | null;
-}
-
-export interface ConnectionHealth {
-  latency: number; // Average latency in ms
-  quality: 'excellent' | 'good' | 'fair' | 'poor';
-  packetLoss: number; // Percentage 0-100
-  lastPingTime: number;
-}
+// Re-export for backward compatibility
+export type { CursorEvent, ConnectionState, ConnectionHealth } from './types/index.js';
 
 export class WebSocketClient {
   private socket: Socket | null = null;
   private connectionState: ConnectionState;
   private reconnectTimer: NodeJS.Timeout | null = null;
-  private maxReconnectAttempts = 5;
   private reconnectDelay = 1000; // Start with 1 second
 
   private connectionHealth: ConnectionHealth = {
@@ -40,33 +52,20 @@ export class WebSocketClient {
   private pingTimes: number[] = [];
   private readonly MAX_PING_SAMPLES = 10;
   private healthCheckInterval: NodeJS.Timeout | null = null;
-  private readonly HEALTH_CHECK_INTERVAL = 5000;
 
   // Event callbacks
-  private onDrawingEventCallback?: (event: DrawingEvent) => void;
-  private onCursorEventCallback?: (cursor: CursorEvent) => void;
-  private onStateSyncCallback?: (state: any) => void;
-  private onConnectionStateCallback?: (state: ConnectionState) => void;
-  private onUserLeftCallback?: (data: { userId: string; timestamp: string }) => void;
-  private onUndoAppliedCallback?: (data: {
-    undoneEvents: DrawingEvent[];
-    userId: string;
-    timestamp: string;
-  }) => void;
-  private onRedoAppliedCallback?: (data: {
-    redoneEvents: DrawingEvent[];
-    userId: string;
-    timestamp: string;
-  }) => void;
-  private onStateSyncFailedCallback?: (error: {
-    message: string;
-    code: string;
-    errors?: string[];
-  }) => void;
-  private onCanvasClearedCallback?: (data: { userId: string; timestamp: string }) => void;
-  private onRoomListCallback?: (data: { rooms: any[]; totalRooms: number }) => void;
-  private onRoomInfoCallback?: (data: any) => void;
-  private onUserJoinedCallback?: (data: { userId: string; timestamp: string }) => void;
+  private onDrawingEventCallback?: DrawingEventCallback;
+  private onCursorEventCallback?: CursorEventCallback;
+  private onStateSyncCallback?: StateSyncCallback;
+  private onConnectionStateCallback?: ConnectionStateCallback;
+  private onUserLeftCallback?: UserLeftCallback;
+  private onUndoAppliedCallback?: UndoAppliedCallback;
+  private onRedoAppliedCallback?: RedoAppliedCallback;
+  private onStateSyncFailedCallback?: StateSyncFailedCallback;
+  private onCanvasClearedCallback?: CanvasClearedCallback;
+  private onRoomListCallback?: RoomListCallback;
+  private onRoomInfoCallback?: RoomInfoCallback;
+  private onUserJoinedCallback?: UserJoinedCallback;
 
   constructor(private serverUrl: string = 'http://localhost:3001') {
     this.connectionState = {
@@ -89,9 +88,9 @@ export class WebSocketClient {
         this.socket = io(this.serverUrl, {
           transports: ['websocket'],
           upgrade: false,
-          timeout: 10000,
+          timeout: SOCKET_TIMEOUT,
           reconnection: true,
-          reconnectionAttempts: 5,
+          reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
           secure: this.serverUrl.startsWith('https'),
         });
 
@@ -159,11 +158,13 @@ export class WebSocketClient {
       throw new Error('Cannot join room: not connected to server');
     }
 
-    this.socket.emit('join-room', {
+    const payload: JoinRoomPayload = {
       roomId,
       userId: this.connectionState.userId,
       createIfNotExists,
-    });
+    };
+
+    this.socket.emit('join-room', payload);
 
     this.connectionState.roomId = roomId;
     console.log(`[WebSocketClient] Joined room: ${roomId}`);
@@ -213,10 +214,12 @@ export class WebSocketClient {
       return;
     }
 
-    this.socket.emit('undo-request', {
+    const payload: UndoRequestPayload = {
       userId: this.connectionState.userId,
       roomId: this.connectionState.roomId,
-    });
+    };
+
+    this.socket.emit('undo-request', payload);
   }
 
   // emits a redo request to the server
@@ -226,10 +229,12 @@ export class WebSocketClient {
       return;
     }
 
-    this.socket.emit('redo-request', {
+    const payload: RedoRequestPayload = {
       userId: this.connectionState.userId,
       roomId: this.connectionState.roomId,
-    });
+    };
+
+    this.socket.emit('redo-request', payload);
   }
 
   // requests state synchronization from server
@@ -239,10 +244,12 @@ export class WebSocketClient {
       return;
     }
 
-    this.socket.emit('request-state-sync', {
+    const payload: StateSyncRequestPayload = {
       clientVersion,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    this.socket.emit('request-state-sync', payload);
   }
 
   // emits a clear canvas request to the server
@@ -252,11 +259,13 @@ export class WebSocketClient {
       return;
     }
 
-    this.socket.emit('clear-canvas', {
+    const payload: ClearCanvasPayload = {
       userId: this.connectionState.userId,
       roomId: this.connectionState.roomId,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    this.socket.emit('clear-canvas', payload);
   }
 
   public requestRoomList(): void {
@@ -274,7 +283,8 @@ export class WebSocketClient {
       return;
     }
 
-    this.socket.emit('request-room-info', { roomId });
+    const payload: RoomInfoRequestPayload = { roomId };
+    this.socket.emit('request-room-info', payload);
   }
 
   public async switchRoom(newRoomId: string, createIfNotExists: boolean = true): Promise<void> {
@@ -285,7 +295,7 @@ export class WebSocketClient {
     const socket = this.socket; // reference for closure
 
     return new Promise((resolve, reject) => {
-      const errorHandler = (error: any) => {
+      const errorHandler = (error: SocketErrorResponse) => {
         if (error.code === 'ROOM_NOT_FOUND') {
           socket.off('error', errorHandler);
           socket.off('room-joined', successHandler);
@@ -304,11 +314,13 @@ export class WebSocketClient {
 
       socket.emit('leave-room');
 
-      socket.emit('join-room', {
+      const payload: JoinRoomPayload = {
         roomId: newRoomId,
         userId: this.connectionState.userId,
         createIfNotExists,
-      });
+      };
+
+      socket.emit('join-room', payload);
 
       this.connectionState.roomId = newRoomId;
       console.log(`[WebSocketClient] Switching to room: ${newRoomId}`);
@@ -317,97 +329,103 @@ export class WebSocketClient {
         socket.off('error', errorHandler);
         socket.off('room-joined', successHandler);
         reject(new Error('Room switch timeout'));
-      }, 5000);
+      }, CONNECTION_CLEANUP_DELAY);
     });
   }
 
   private setupSocketEventListeners(): void {
     if (!this.socket) return;
 
-    this.socket.on('drawing-event', (event: any) => {
-      if (validateDrawingEvent(event) && this.onDrawingEventCallback) {
-        // Don't process our own events
-        if (event.userId !== this.connectionState.userId) {
-          this.onDrawingEventCallback(event);
-        }
-      } else {
-        console.warn('[WebSocketClient] Received invalid drawing event:', event);
+    this.socket.on('drawing-event', (rawEvent: unknown) => {
+      // Validate and narrow type first
+      if (!validateDrawingEvent(rawEvent)) {
+        console.warn('[WebSocketClient] Received invalid drawing event:', rawEvent);
+        return;
+      }
+
+      if (!this.onDrawingEventCallback) {
+        return;
+      }
+
+      // Don't process our own events
+      if (rawEvent.userId !== this.connectionState.userId) {
+        this.onDrawingEventCallback(rawEvent);
       }
     });
 
-    this.socket.on('cursor-event', (cursor: any) => {
+    this.socket.on('cursor-event', (cursor: CursorEvent) => {
       if (this.onCursorEventCallback && cursor.userId !== this.connectionState.userId) {
         this.onCursorEventCallback(cursor);
       }
     });
 
-    this.socket.on('state-sync', (state: any) => {
+    this.socket.on('state-sync', (state: unknown) => {
       if (this.onStateSyncCallback) {
-        this.onStateSyncCallback(state);
+        this.onStateSyncCallback(state as Parameters<StateSyncCallback>[0]);
       }
     });
 
-    this.socket.on('room-joined', (data: any) => {
+    this.socket.on('room-joined', (data: unknown) => {
       console.log(`[WebSocketClient] Room join confirmed:`, data);
     });
 
-    this.socket.on('user-left', (data: any) => {
+    this.socket.on('user-left', (data: unknown) => {
       console.log(`[WebSocketClient] User left room:`, data);
       if (this.onUserLeftCallback) {
-        this.onUserLeftCallback(data);
+        this.onUserLeftCallback(data as Parameters<UserLeftCallback>[0]);
       }
     });
 
-    this.socket.on('undo-applied', (data: any) => {
+    this.socket.on('undo-applied', (data: unknown) => {
       console.log(`[WebSocketClient] Undo applied:`, data);
       if (this.onUndoAppliedCallback) {
-        this.onUndoAppliedCallback(data);
+        this.onUndoAppliedCallback(data as Parameters<UndoAppliedCallback>[0]);
       }
     });
 
-    this.socket.on('redo-applied', (data: any) => {
+    this.socket.on('redo-applied', (data: unknown) => {
       console.log(`[WebSocketClient] Redo applied:`, data);
       if (this.onRedoAppliedCallback) {
-        this.onRedoAppliedCallback(data);
+        this.onRedoAppliedCallback(data as Parameters<RedoAppliedCallback>[0]);
       }
     });
 
-    this.socket.on('state-sync-failed', (error: any) => {
+    this.socket.on('state-sync-failed', (error: unknown) => {
       console.error(`[WebSocketClient] State sync failed:`, error);
       if (this.onStateSyncFailedCallback) {
-        this.onStateSyncFailedCallback(error);
+        this.onStateSyncFailedCallback(error as Parameters<StateSyncFailedCallback>[0]);
       }
     });
 
-    this.socket.on('canvas-cleared', (data: any) => {
+    this.socket.on('canvas-cleared', (data: unknown) => {
       console.log(`[WebSocketClient] Canvas cleared:`, data);
       if (this.onCanvasClearedCallback) {
-        this.onCanvasClearedCallback(data);
+        this.onCanvasClearedCallback(data as Parameters<CanvasClearedCallback>[0]);
       }
     });
 
-    this.socket.on('room-list', (data: any) => {
+    this.socket.on('room-list', (data: unknown) => {
       console.log(`[WebSocketClient] Received room list:`, data);
       if (this.onRoomListCallback) {
-        this.onRoomListCallback(data);
+        this.onRoomListCallback(data as Parameters<RoomListCallback>[0]);
       }
     });
 
-    this.socket.on('room-info', (data: any) => {
+    this.socket.on('room-info', (data: unknown) => {
       console.log(`[WebSocketClient] Received room info:`, data);
       if (this.onRoomInfoCallback) {
-        this.onRoomInfoCallback(data);
+        this.onRoomInfoCallback(data as Parameters<RoomInfoCallback>[0]);
       }
     });
 
-    this.socket.on('user-joined', (data: any) => {
+    this.socket.on('user-joined', (data: unknown) => {
       console.log(`[WebSocketClient] User joined room:`, data);
       if (this.onUserJoinedCallback) {
-        this.onUserJoinedCallback(data);
+        this.onUserJoinedCallback(data as Parameters<UserJoinedCallback>[0]);
       }
     });
 
-    this.socket.on('error', (error: any) => {
+    this.socket.on('error', (error: SocketErrorResponse) => {
       console.error('[WebSocketClient] Socket error:', error);
       this.connectionState.lastError = error.message || 'Unknown socket error';
       this.notifyConnectionStateChange();
@@ -416,7 +434,7 @@ export class WebSocketClient {
 
   // attempts to reconnect to the server
   private attemptReconnection(roomId: string): void {
-    if (this.connectionState.reconnectAttempts >= this.maxReconnectAttempts) {
+    if (this.connectionState.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       console.error('[WebSocketClient] Max reconnection attempts reached');
       this.connectionState.lastError = 'Max reconnection attempts reached';
       this.notifyConnectionStateChange();
@@ -427,7 +445,7 @@ export class WebSocketClient {
     const delay = this.reconnectDelay * Math.pow(2, this.connectionState.reconnectAttempts - 1);
 
     console.log(
-      `[WebSocketClient] Attempting reconnection ${this.connectionState.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`,
+      `[WebSocketClient] Attempting reconnection ${this.connectionState.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`,
     );
 
     this.reconnectTimer = setTimeout(async () => {
@@ -452,57 +470,51 @@ export class WebSocketClient {
   }
 
   // Setters (Event Listeners)
-  public onDrawingEvent(callback: (event: DrawingEvent) => void): void {
+  public onDrawingEvent(callback: DrawingEventCallback): void {
     this.onDrawingEventCallback = callback;
   }
 
-  public onCursorEvent(callback: (cursor: CursorEvent) => void): void {
+  public onCursorEvent(callback: CursorEventCallback): void {
     this.onCursorEventCallback = callback;
   }
 
-  public onStateSync(callback: (state: any) => void): void {
+  public onStateSync(callback: StateSyncCallback): void {
     this.onStateSyncCallback = callback;
   }
 
-  public onConnectionState(callback: (state: ConnectionState) => void): void {
+  public onConnectionState(callback: ConnectionStateCallback): void {
     this.onConnectionStateCallback = callback;
   }
 
-  public onUserLeft(callback: (data: { userId: string; timestamp: string }) => void): void {
+  public onUserLeft(callback: UserLeftCallback): void {
     this.onUserLeftCallback = callback;
   }
 
-  public onUndoApplied(
-    callback: (data: { undoneEvents: DrawingEvent[]; userId: string; timestamp: string }) => void,
-  ): void {
+  public onUndoApplied(callback: UndoAppliedCallback): void {
     this.onUndoAppliedCallback = callback;
   }
 
-  public onRedoApplied(
-    callback: (data: { redoneEvents: DrawingEvent[]; userId: string; timestamp: string }) => void,
-  ): void {
+  public onRedoApplied(callback: RedoAppliedCallback): void {
     this.onRedoAppliedCallback = callback;
   }
 
-  public onStateSyncFailed(
-    callback: (error: { message: string; code: string; errors?: string[] }) => void,
-  ): void {
+  public onStateSyncFailed(callback: StateSyncFailedCallback): void {
     this.onStateSyncFailedCallback = callback;
   }
 
-  public onCanvasCleared(callback: (data: { userId: string; timestamp: string }) => void): void {
+  public onCanvasCleared(callback: CanvasClearedCallback): void {
     this.onCanvasClearedCallback = callback;
   }
 
-  public onRoomList(callback: (data: { rooms: any[]; totalRooms: number }) => void): void {
+  public onRoomList(callback: RoomListCallback): void {
     this.onRoomListCallback = callback;
   }
 
-  public onRoomInfo(callback: (data: any) => void): void {
+  public onRoomInfo(callback: RoomInfoCallback): void {
     this.onRoomInfoCallback = callback;
   }
 
-  public onUserJoined(callback: (data: { userId: string; timestamp: string }) => void): void {
+  public onUserJoined(callback: UserJoinedCallback): void {
     this.onUserJoinedCallback = callback;
   }
 
@@ -534,7 +546,7 @@ export class WebSocketClient {
 
     this.healthCheckInterval = setInterval(() => {
       this.performHealthCheck();
-    }, this.HEALTH_CHECK_INTERVAL);
+    }, HEALTH_CHECK_INTERVAL);
   }
 
   private stopHealthMonitoring(): void {
@@ -552,9 +564,10 @@ export class WebSocketClient {
 
     const startTime = Date.now();
 
-    this.socket.emit('ping', { timestamp: startTime });
+    const payload: PingPayload = { timestamp: startTime };
+    this.socket.emit('ping', payload);
 
-    const pongListener = (data: { timestamp: number }) => {
+    const pongListener = (data: PongPayload) => {
       const latency = Date.now() - data.timestamp;
       this.recordLatency(latency);
       this.updateConnectionQuality();

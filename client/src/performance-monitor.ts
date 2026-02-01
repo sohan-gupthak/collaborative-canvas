@@ -1,12 +1,7 @@
-export interface PerformanceMetrics {
-  fps: number;
-  averageFrameTime: number;
-  eventProcessingTime: number;
-  memoryUsageMB: number;
-  networkLatency: number;
-  totalEvents: number;
-  droppedFrames: number;
-}
+import type { PerformanceMetrics, MetricsUpdateCallback } from './types/index.js';
+import { MAX_FRAME_TIME, PERFORMANCE_CHECK_INTERVAL } from './config/constants.js';
+
+export type { PerformanceMetrics } from './types/index.js';
 
 export class PerformanceMonitor {
   private frameCount = 0;
@@ -16,8 +11,7 @@ export class PerformanceMonitor {
   private droppedFrames = 0;
   private totalEvents = 0;
   private readonly MAX_SAMPLES = 60; // Keep last 60 samples
-  private readonly TARGET_FRAME_TIME = 16.67; // ~60 FPS
-  private metricsUpdateCallback?: (metrics: PerformanceMetrics) => void;
+  private metricsUpdateCallback?: MetricsUpdateCallback;
   private updateInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -25,10 +19,9 @@ export class PerformanceMonitor {
   }
 
   private startMonitoring(): void {
-    // Update metrics every second
     this.updateInterval = setInterval(() => {
       this.updateMetrics();
-    }, 1000);
+    }, PERFORMANCE_CHECK_INTERVAL);
   }
 
   public stopMonitoring(): void {
@@ -48,7 +41,7 @@ export class PerformanceMonitor {
     }
 
     // Track dropped frames (frames that took longer than target)
-    if (frameTime > this.TARGET_FRAME_TIME * 1.5) {
+    if (frameTime > MAX_FRAME_TIME * 1.5) {
       this.droppedFrames++;
     }
 
@@ -110,7 +103,7 @@ export class PerformanceMonitor {
     // For future enhancement use - network latency is currently tracked by websocket-client (TODO)
   }
 
-  public onMetricsUpdate(callback: (metrics: PerformanceMetrics) => void): void {
+  public onMetricsUpdate(callback: MetricsUpdateCallback): void {
     this.metricsUpdateCallback = callback;
   }
 

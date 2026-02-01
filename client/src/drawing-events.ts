@@ -1,90 +1,98 @@
-export interface Point {
-  x: number;
-  y: number;
-  timestamp: number;
-}
+// Re-export types from centralized types module
+export type {
+  Point,
+  DrawingStyle,
+  DrawingEvent,
+  DrawingEventType,
+  LineCap,
+  LineJoin,
+} from './types/index.js';
 
-export interface DrawingStyle {
-  color: string;
-  lineWidth: number;
-  lineCap: 'round' | 'square' | 'butt';
-  lineJoin: 'round' | 'bevel' | 'miter';
-  isEraser?: boolean;
-}
+import type {
+  Point,
+  DrawingStyle,
+  DrawingEvent,
+  LineCap,
+  LineJoin,
+  DrawingEventType,
+} from './types/index.js';
+import {
+  VALID_LINE_CAPS,
+  VALID_LINE_JOINS,
+  VALID_EVENT_TYPES,
+  MAX_COORDINATE,
+  MIN_COORDINATE,
+  MAX_LINE_WIDTH,
+  MIN_LINE_WIDTH,
+  DEFAULT_STROKE_COLOR,
+} from './config/constants.js';
 
-export interface DrawingEvent {
-  id: string;
-  strokeId: string;
-  type: 'line' | 'start' | 'end';
-  userId: string;
-  roomId: string;
-  points: Point[];
-  style: DrawingStyle;
-  timestamp: number;
-}
+export function validatePoint(point: unknown): point is Point {
+  if (typeof point !== 'object' || point === null) {
+    return false;
+  }
 
-export function validatePoint(point: any): point is Point {
+  const p = point as Record<string, unknown>;
+
   return (
-    typeof point === 'object' &&
-    point !== null &&
-    typeof point.x === 'number' &&
-    typeof point.y === 'number' &&
-    typeof point.timestamp === 'number' &&
-    Number.isFinite(point.x) &&
-    Number.isFinite(point.y) &&
-    Number.isFinite(point.timestamp) &&
-    point.timestamp > 0
+    typeof p.x === 'number' &&
+    typeof p.y === 'number' &&
+    typeof p.timestamp === 'number' &&
+    Number.isFinite(p.x) &&
+    Number.isFinite(p.y) &&
+    Number.isFinite(p.timestamp) &&
+    p.timestamp > 0
   );
 }
 
-export function validateDrawingStyle(style: any): style is DrawingStyle {
-  const validLineCaps = ['round', 'square', 'butt'];
-  const validLineJoins = ['round', 'bevel', 'miter'];
+export function validateDrawingStyle(style: unknown): style is DrawingStyle {
+  if (typeof style !== 'object' || style === null) {
+    return false;
+  }
+
+  const s = style as Record<string, unknown>;
 
   return (
-    typeof style === 'object' &&
-    style !== null &&
-    typeof style.color === 'string' &&
-    typeof style.lineWidth === 'number' &&
-    typeof style.lineCap === 'string' &&
-    typeof style.lineJoin === 'string' &&
-    style.color.length > 0 &&
-    Number.isFinite(style.lineWidth) &&
-    style.lineWidth > 0 &&
-    validLineCaps.includes(style.lineCap) &&
-    validLineJoins.includes(style.lineJoin)
+    typeof s.color === 'string' &&
+    typeof s.lineWidth === 'number' &&
+    typeof s.lineCap === 'string' &&
+    typeof s.lineJoin === 'string' &&
+    s.color.length > 0 &&
+    Number.isFinite(s.lineWidth) &&
+    s.lineWidth > 0 &&
+    VALID_LINE_CAPS.includes(s.lineCap as LineCap) &&
+    VALID_LINE_JOINS.includes(s.lineJoin as LineJoin)
   );
 }
 
-export function validateDrawingEvent(event: any): event is DrawingEvent {
-  const validTypes = ['line', 'start', 'end'];
+export function validateDrawingEvent(event: unknown): event is DrawingEvent {
+  if (typeof event !== 'object' || event === null) {
+    return false;
+  }
+
+  const e = event as Record<string, unknown>;
 
   return (
-    typeof event === 'object' &&
-    event !== null &&
-    typeof event.id === 'string' &&
-    typeof event.strokeId === 'string' &&
-    typeof event.type === 'string' &&
-    typeof event.userId === 'string' &&
-    typeof event.roomId === 'string' &&
-    Array.isArray(event.points) &&
-    typeof event.timestamp === 'number' &&
-    event.id.length > 0 &&
-    event.strokeId.length > 0 &&
-    validTypes.includes(event.type) &&
-    event.userId.length > 0 &&
-    event.roomId.length > 0 &&
-    event.points.every(validatePoint) &&
-    validateDrawingStyle(event.style) &&
-    Number.isFinite(event.timestamp) &&
-    event.timestamp > 0
+    typeof e.id === 'string' &&
+    typeof e.strokeId === 'string' &&
+    typeof e.type === 'string' &&
+    typeof e.userId === 'string' &&
+    typeof e.roomId === 'string' &&
+    Array.isArray(e.points) &&
+    typeof e.timestamp === 'number' &&
+    e.id.length > 0 &&
+    e.strokeId.length > 0 &&
+    VALID_EVENT_TYPES.includes(e.type as DrawingEventType) &&
+    e.userId.length > 0 &&
+    e.roomId.length > 0 &&
+    e.points.every(validatePoint) &&
+    validateDrawingStyle(e.style) &&
+    Number.isFinite(e.timestamp) &&
+    e.timestamp > 0
   );
 }
 
 export function sanitizePoint(point: Point): Point {
-  const MAX_COORDINATE = 100000;
-  const MIN_COORDINATE = -100000;
-
   return {
     x: Math.max(MIN_COORDINATE, Math.min(MAX_COORDINATE, point.x)),
     y: Math.max(MIN_COORDINATE, Math.min(MAX_COORDINATE, point.y)),
@@ -93,11 +101,8 @@ export function sanitizePoint(point: Point): Point {
 }
 
 export function sanitizeDrawingStyle(style: DrawingStyle): DrawingStyle {
-  const MAX_LINE_WIDTH = 100;
-  const MIN_LINE_WIDTH = 0.1;
-
   return {
-    color: style.color.trim() || '#000000',
+    color: style.color.trim() || DEFAULT_STROKE_COLOR,
     lineWidth: Math.max(MIN_LINE_WIDTH, Math.min(MAX_LINE_WIDTH, style.lineWidth)),
     lineCap: style.lineCap,
     lineJoin: style.lineJoin,
@@ -113,12 +118,12 @@ export function sanitizeDrawingEvent(event: DrawingEvent): DrawingEvent {
     roomId: event.roomId.trim(),
     points: event.points.map(sanitizePoint),
     style: sanitizeDrawingStyle(event.style),
-    timestamp: Math.max(0, event.timestamp),
+    timestamp: event.timestamp,
   };
 }
 
 export function createDrawingEvent(
-  type: 'line' | 'start' | 'end',
+  type: DrawingEventType,
   userId: string,
   roomId: string,
   points: Point[],
