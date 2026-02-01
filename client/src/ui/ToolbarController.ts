@@ -13,23 +13,34 @@ export class ToolbarController {
   private brushSizeValueDesktop: HTMLSpanElement | null;
   private toolBrush: HTMLInputElement | null;
   private toolEraser: HTMLInputElement | null;
+  private toolBrushDesktop: HTMLInputElement | null;
+  private toolEraserDesktop: HTMLInputElement | null;
 
   private callbacks: ToolbarCallbacks;
 
   constructor(callbacks: ToolbarCallbacks) {
     this.callbacks = callbacks;
 
-    // Get DOM elements
+    // Get DOM elements - Mobile
     this.colorPicker = document.getElementById('color-picker') as HTMLInputElement;
-    this.colorPickerDesktop = document.getElementById('color-picker-desktop') as HTMLInputElement;
     this.brushSizeSlider = document.getElementById('brush-size') as HTMLInputElement;
     this.brushSizeValue = document.getElementById('brush-size-value') as HTMLSpanElement;
+    this.toolBrush = document.getElementById('tool-brush') as HTMLInputElement;
+    this.toolEraser = document.getElementById('tool-eraser') as HTMLInputElement;
+
+    // Get DOM elements - Desktop
+    this.colorPickerDesktop = document.getElementById('color-picker-desktop') as HTMLInputElement;
     this.brushSizeSliderDesktop = document.getElementById('brush-size-desktop') as HTMLInputElement;
     this.brushSizeValueDesktop = document.getElementById(
       'brush-size-value-desktop',
     ) as HTMLSpanElement;
-    this.toolBrush = document.getElementById('tool-brush') as HTMLInputElement;
-    this.toolEraser = document.getElementById('tool-eraser') as HTMLInputElement;
+    this.toolBrushDesktop = document.getElementById('tool-brush-desktop') as HTMLInputElement;
+    this.toolEraserDesktop = document.getElementById('tool-eraser-desktop') as HTMLInputElement;
+
+    console.log('[ToolbarController] Mobile toolBrush found:', this.toolBrush);
+    console.log('[ToolbarController] Mobile toolEraser found:', this.toolEraser);
+    console.log('[ToolbarController] Desktop toolBrushDesktop found:', this.toolBrushDesktop);
+    console.log('[ToolbarController] Desktop toolEraserDesktop found:', this.toolEraserDesktop);
 
     this.setupEventListeners();
   }
@@ -96,21 +107,83 @@ export class ToolbarController {
     }
 
     if (this.toolBrush) {
-      this.toolBrush.addEventListener('change', () => {
+      const handleBrushChange = () => {
+        console.log(
+          '[ToolbarController] Mobile brush change triggered, checked:',
+          this.toolBrush!.checked,
+        );
         if (this.toolBrush!.checked) {
           this.callbacks.onToolChange(false); // Not eraser
+          if (this.toolBrushDesktop) {
+            this.toolBrushDesktop.checked = true;
+          }
           console.log('Tool switched to: Brush');
         }
-      });
+      };
+      this.toolBrush.addEventListener('change', handleBrushChange);
+      this.toolBrush.addEventListener('click', handleBrushChange);
+    } else {
+      console.log('[ToolbarController] Mobile toolBrush element not found!');
     }
 
     if (this.toolEraser) {
-      this.toolEraser.addEventListener('change', () => {
+      const handleEraserChange = () => {
+        console.log(
+          '[ToolbarController] Mobile eraser change triggered, checked:',
+          this.toolEraser!.checked,
+        );
         if (this.toolEraser!.checked) {
           this.callbacks.onToolChange(true); // Is eraser
+          if (this.toolEraserDesktop) {
+            this.toolEraserDesktop.checked = true;
+          }
           console.log('Tool switched to: Eraser');
         }
-      });
+      };
+      this.toolEraser.addEventListener('change', handleEraserChange);
+      this.toolEraser.addEventListener('click', handleEraserChange);
+    } else {
+      console.log('[ToolbarController] Mobile toolEraser element not found!');
+    }
+
+    if (this.toolBrushDesktop) {
+      const handleBrushChange = () => {
+        console.log(
+          '[ToolbarController] Desktop brush change triggered, checked:',
+          this.toolBrushDesktop!.checked,
+        );
+        if (this.toolBrushDesktop!.checked) {
+          this.callbacks.onToolChange(false); // Not eraser
+          if (this.toolBrush) {
+            this.toolBrush.checked = true;
+          }
+          console.log('Tool switched to: Brush (desktop)');
+        }
+      };
+      this.toolBrushDesktop.addEventListener('change', handleBrushChange);
+      this.toolBrushDesktop.addEventListener('click', handleBrushChange);
+    } else {
+      console.log('[ToolbarController] Desktop toolBrushDesktop element not found!');
+    }
+
+    if (this.toolEraserDesktop) {
+      const handleEraserChange = () => {
+        console.log(
+          '[ToolbarController] Desktop eraser change triggered, checked:',
+          this.toolEraserDesktop!.checked,
+        );
+        if (this.toolEraserDesktop!.checked) {
+          this.callbacks.onToolChange(true); // Is eraser
+          if (this.toolEraser) {
+            this.toolEraser.checked = true;
+          }
+          console.log('Tool switched to: Eraser (desktop)');
+        }
+      };
+      this.toolEraserDesktop.addEventListener('change', handleEraserChange);
+      this.toolEraserDesktop.addEventListener('click', handleEraserChange);
+    } else {
+      console.log('[ToolbarController] Desktop toolEraserDesktop element not found!');
     }
   }
 
@@ -144,9 +217,15 @@ export class ToolbarController {
       if (this.toolEraser) {
         this.toolEraser.checked = true;
       }
+      if (this.toolEraserDesktop) {
+        this.toolEraserDesktop.checked = true;
+      }
     } else {
       if (this.toolBrush) {
         this.toolBrush.checked = true;
+      }
+      if (this.toolBrushDesktop) {
+        this.toolBrushDesktop.checked = true;
       }
     }
   }

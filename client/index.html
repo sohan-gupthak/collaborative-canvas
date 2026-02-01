@@ -224,12 +224,25 @@
         <div class="d-none d-md-flex flex-column gap-3" style="min-width: 200px">
           <div class="d-flex flex-column gap-2 pb-3 border-bottom">
             <label class="d-flex align-items-center gap-2 p-2 rounded cursor-pointer tool-label">
-              <input type="radio" name="tool" value="brush" checked class="d-none" />
+              <input
+                type="radio"
+                id="tool-brush-desktop"
+                name="tool-desktop"
+                value="brush"
+                checked
+                class="d-none"
+              />
               <span class="tool-icon"><i class="fas fa-paint-brush fs-5"></i></span>
               <span class="tool-text small">Brush</span>
             </label>
             <label class="d-flex align-items-center gap-2 p-2 rounded cursor-pointer tool-label">
-              <input type="radio" name="tool" value="eraser" class="d-none" />
+              <input
+                type="radio"
+                id="tool-eraser-desktop"
+                name="tool-desktop"
+                value="eraser"
+                class="d-none"
+              />
               <span class="tool-icon"><i class="fas fa-eraser fs-5"></i></span>
               <span class="tool-text small">Eraser</span>
             </label>
@@ -253,7 +266,7 @@
             <input
               type="range"
               id="brush-size-desktop"
-              class="form-range"
+              class="form-control form-range"
               min="1"
               max="50"
               value="2"

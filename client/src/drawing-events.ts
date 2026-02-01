@@ -1,4 +1,3 @@
-// Re-export types from centralized types module
 export type {
   Point,
   DrawingStyle,
@@ -106,6 +105,7 @@ export function sanitizeDrawingStyle(style: DrawingStyle): DrawingStyle {
     lineWidth: Math.max(MIN_LINE_WIDTH, Math.min(MAX_LINE_WIDTH, style.lineWidth)),
     lineCap: style.lineCap,
     lineJoin: style.lineJoin,
+    isEraser: style.isEraser,
   };
 }
 

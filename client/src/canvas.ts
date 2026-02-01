@@ -296,8 +296,8 @@ export class Canvas {
     this.currentStrokeStyle = {
       color: this.isEraserMode ? '#ffffff' : this.currentColor,
       lineWidth: this.currentLineWidth,
-      lineCap: 'round',
-      lineJoin: 'round',
+      lineCap: DEFAULT_LINE_CAP,
+      lineJoin: DEFAULT_LINE_JOIN,
       isEraser: this.isEraserMode,
     };
 

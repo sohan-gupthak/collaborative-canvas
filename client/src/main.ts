@@ -32,62 +32,76 @@ const roomId = urlParams.get('room') || 'default-room';
 // Connection state management
 let isConnected = false;
 
-// Initialize UI Coordinator
-const uiCallbacks: UICallbacks = {
-  // Toolbar callbacks
-  onColorChange: (color: string) => {
-    canvas.setColor(color);
-  },
-  onBrushSizeChange: (size: number) => {
-    canvas.setBrushSize(size);
-  },
-  onToolChange: (isEraser: boolean) => {
-    canvas.setEraserMode(isEraser);
-  },
+// Initialize UI Coordinator after DOM is ready
+let uiCoordinator: UICoordinator;
 
-  // Room callbacks
-  onCreateRoom: async (roomName: string) => {
-    await wsClient.switchRoom(roomName);
-  },
-  onJoinRoom: async (roomName: string) => {
-    await wsClient.switchRoom(roomName, false); // Don't create if doesn't exist
-  },
-  onSwitchRoom: async (roomId: string) => {
-    await wsClient.switchRoom(roomId);
-  },
-  onRefreshRooms: () => {
-    wsClient.requestRoomList();
-  },
-  onRoomPanelOpened: () => {
-    wsClient.requestRoomList();
-  },
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeUI);
+} else {
+  initializeUI();
+}
 
-  // Action callbacks
-  onUndo: () => {
-    if (isConnected) {
-      console.log('Undo button clicked');
-      wsClient.emitUndoRequest();
-    }
-  },
-  onRedo: () => {
-    if (isConnected) {
-      console.log('Redo button clicked');
-      wsClient.emitRedoRequest();
-    }
-  },
-  onClear: () => {
-    if (isConnected) {
-      console.log('Clear button clicked');
-      wsClient.emitClearCanvas();
-    } else {
-      console.log('Clear button clicked - clearing locally (not connected)');
-      stateManager.clearState();
-      canvas.clearCanvas();
-    }
-  },
-};
+function initializeUI() {
+  console.log('[Main] Initializing UI Coordinator...');
 
-const uiCoordinator = new UICoordinator(uiCallbacks, roomId);
+  const uiCallbacks: UICallbacks = {
+    // Toolbar callbacks
+    onColorChange: (color: string) => {
+      canvas.setColor(color);
+    },
+    onBrushSizeChange: (size: number) => {
+      canvas.setBrushSize(size);
+    },
+    onToolChange: (isEraser: boolean) => {
+      console.log('[Main] onToolChange callback triggered, isEraser:', isEraser);
+      canvas.setEraserMode(isEraser);
+    },
+
+    // Room callbacks
+    onCreateRoom: async (roomName: string) => {
+      await wsClient.switchRoom(roomName);
+    },
+    onJoinRoom: async (roomName: string) => {
+      await wsClient.switchRoom(roomName, false); // Don't create if doesn't exist
+    },
+    onSwitchRoom: async (roomId: string) => {
+      await wsClient.switchRoom(roomId);
+    },
+    onRefreshRooms: () => {
+      wsClient.requestRoomList();
+    },
+    onRoomPanelOpened: () => {
+      wsClient.requestRoomList();
+    },
+
+    // Action callbacks
+    onUndo: () => {
+      if (isConnected) {
+        console.log('Undo button clicked');
+        wsClient.emitUndoRequest();
+      }
+    },
+    onRedo: () => {
+      if (isConnected) {
+        console.log('Redo button clicked');
+        wsClient.emitRedoRequest();
+      }
+    },
+    onClear: () => {
+      if (isConnected) {
+        console.log('Clear button clicked');
+        wsClient.emitClearCanvas();
+      } else {
+        console.log('Clear button clicked - clearing locally (not connected)');
+        stateManager.clearState();
+        canvas.clearCanvas();
+      }
+    },
+  };
+
+  uiCoordinator = new UICoordinator(uiCallbacks, roomId);
+  console.log('[Main] UI Coordinator initialized');
+}
 
 wsClient.onDrawingEvent((event: DrawingEvent) => {
   console.log('Received drawing event from user:', event.userId, event.type);
@@ -115,20 +129,20 @@ wsClient.onUserLeft((data) => {
 wsClient.onUndoApplied((data) => {
   console.log('Undo applied by user:', data.userId, 'events:', data.undoneEvents.length);
   stateManager.handleUndo(data.undoneEvents);
-  uiCoordinator.setActionsEnabled(isConnected);
+  uiCoordinator?.setActionsEnabled(isConnected);
 });
 
 wsClient.onRedoApplied((data) => {
   console.log('Redo applied by user:', data.userId, 'events:', data.redoneEvents.length);
   stateManager.handleRedo(data.redoneEvents);
-  uiCoordinator.setActionsEnabled(isConnected);
+  uiCoordinator?.setActionsEnabled(isConnected);
 });
 
 wsClient.onCanvasCleared((data) => {
   console.log('Canvas cleared by user:', data.userId);
   stateManager.clearState();
   canvas.clearCanvas();
-  uiCoordinator.setActionsEnabled(isConnected);
+  uiCoordinator?.setActionsEnabled(isConnected);
 });
 
 stateManager.onStateReconstructed((events: readonly DrawingEvent[]) => {
@@ -157,7 +171,7 @@ canvas.setOnDrawingEvent((event: DrawingEvent) => {
     console.warn('Cannot send drawing event: not connected to server');
   }
 
-  uiCoordinator.setActionsEnabled(isConnected);
+  uiCoordinator?.setActionsEnabled(isConnected);
 });
 
 canvas.setOnCursorEvent((cursor) => {
@@ -172,19 +186,19 @@ wsClient.onConnectionState((state) => {
   isConnected = state.isConnected;
 
   if (state.isConnected) {
-    uiCoordinator.updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
+    uiCoordinator?.updateConnectionStatus(true, `Connected to room: ${state.roomId}`);
     console.log('Connected to WebSocket server, room:', state.roomId);
 
     canvas.setUserContext(state.userId, state.roomId || roomId);
-    uiCoordinator.setActionsEnabled(true);
+    uiCoordinator?.setActionsEnabled(true);
 
     if (state.roomId) {
       wsClient.requestRoomInfo(state.roomId);
     }
   } else {
-    uiCoordinator.updateConnectionStatus(false, state.lastError || 'Disconnected');
+    uiCoordinator?.updateConnectionStatus(false, state.lastError || 'Disconnected');
     console.log('Disconnected from WebSocket server');
-    uiCoordinator.setActionsEnabled(false);
+    uiCoordinator?.setActionsEnabled(false);
   }
 });
 
@@ -199,7 +213,7 @@ perfMonitor.onMetricsUpdate((metrics) => {
   const memoryStats = stateManager.getMemoryStats();
   const health = wsClient.getConnectionHealth();
 
-  uiCoordinator.updatePerformanceMetrics(
+  uiCoordinator?.updatePerformanceMetrics(
     metrics.fps,
     health.latency,
     memoryStats.estimatedSizeMB,
@@ -216,12 +230,12 @@ animationLoop();
 // connection starts here
 async function initializeConnection() {
   try {
-    uiCoordinator.updateConnectionStatus(false, 'Connecting...');
+    uiCoordinator?.updateConnectionStatus(false, 'Connecting...');
     await wsClient.connect(roomId);
     console.log('Successfully connected to collaborative drawing session');
   } catch (error) {
     console.error('Failed to connect to server:', error);
-    uiCoordinator.updateConnectionStatus(false, 'Connection failed - drawing locally only');
+    uiCoordinator?.updateConnectionStatus(false, 'Connection failed - drawing locally only');
   }
 }
 
@@ -234,7 +248,7 @@ wsClient.onRoomList((data) => {
     clientCount: room.clientCount,
     historySize: room.stateStats.historySize,
   }));
-  uiCoordinator.updateRoomList(rooms);
+  uiCoordinator?.updateRoomList(rooms);
 });
 
 // Setup user joined handler
@@ -247,14 +261,14 @@ wsClient.onUserJoined((data) => {
 // Setup room info handler
 wsClient.onRoomInfo((data) => {
   if (data.exists) {
-    uiCoordinator.updateUserCount(data.clientCount);
+    uiCoordinator?.updateUserCount(data.clientCount);
   }
 });
 
 window.addEventListener('beforeunload', () => {
   perfMonitor.stopMonitoring();
   wsClient.disconnect();
-  uiCoordinator.destroy();
+  uiCoordinator?.destroy();
 });
 
 // Handle visibility change (pause/resume connection)
